@@ -1,14 +1,14 @@
-cmake_minimum_required(VERSION 4.12.0)
+cmake_minimum_required(VERSION 4.0)
 
 cmake_policy(SET CMP0135 NEW)
 
-project(nbtgTimer
+project(optograin
     DESCRIPTION "OptoGrain enlarger side firmware"
     LANGUAGES C ASM
     VERSION "0.0.1"
 )
 
-set(TARGET_FILE "nbtgTimer")
+set(TARGET_FILE "optograin")
 add_executable(${TARGET_FILE}.elf)
 
 if (NOT BUILD_TESTS)
@@ -36,18 +36,12 @@ add_compile_definitions(
     $<$<CONFIG:Debug>:DEBUG>
 )
 
-add_subdirectory(nbtgTimer)
+add_subdirectory(optograin)
 add_subdirectory(sys)
-add_subdirectory(lib)
-
-target_sources(${FW_ELF_FILE} PRIVATE
-    ${CMAKE_SOURCE_DIR}/sys/stm32f1xx_sys/CMSIS/Device/system_stm32f1xx.c
-    ${CMAKE_SOURCE_DIR}/sys/stm32f1xx_sys/startup_f103xx.s
-)
 
 target_link_libraries(${FW_ELF_FILE} PRIVATE
-    stm32f1xx_sys
     stm32f1xx_ll
+    stm32f1xx_cmsis
     freertos_kernel
     freertos_config
     bsp
@@ -56,7 +50,6 @@ target_link_libraries(${FW_ELF_FILE} PRIVATE
 
 target_link_options(${FW_ELF_FILE} PRIVATE
     -Wl,-Map=${FW_MAP_FILE},--cref
-    -T${CMAKE_CURRENT_SOURCE_DIR}/sys/stm32f1xx_sys/OptoGrain.ld
 )
 
 

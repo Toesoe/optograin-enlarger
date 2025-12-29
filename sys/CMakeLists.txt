@@ -1,1 +1,1 @@
-add_subdirectory(stm32f1xx-hal-driver)
+add_subdirectory(stm32-hal)

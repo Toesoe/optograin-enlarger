@@ -1,3 +1,3 @@
-[submodule "sys/stm32-hal/stm32f1xx-hal-driver"]
-	path = sys/stm32-hal/stm32f1xx-hal-driver
-	url = https://github.com/STMicroelectronics/stm32f1xx-hal-driver.git
+[submodule "sys/stm32-hal/STM32CubeF1"]
+	path = sys/stm32-hal/STM32CubeF1
+	url = https://github.com/STMicroelectronics/STM32CubeF1.git

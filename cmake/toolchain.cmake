@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.12 FATAL_ERROR)
+cmake_minimum_required(VERSION 4.0 FATAL_ERROR)
 
 set(TARGET_CPU "cortex-m3")
 
