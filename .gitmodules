@@ -1,0 +1,3 @@
+[submodule "sys/stm32f1xx-hal-driver"]
+	path = sys/stm32f1xx-hal-driver
+	url = https://github.com/STMicroelectronics/stm32f1xx-hal-driver.git
