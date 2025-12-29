@@ -1,0 +1,8 @@
+**/build/*
+*.o
+*.d
+.vscode/**
+Doxygen/
+*.DS_Store
+.cache
+external
