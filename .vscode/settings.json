@@ -1,0 +1,17 @@
+{
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "cmake.generator": "Ninja",
+    "files.associations": {
+        "*.h": "c",
+        "*.c": "c"
+    },
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "clangd.arguments": [
+        "--query-driver=/usr/bin/arm-none-eabi-*",
+        "--resource-dir=/usr/lib/gcc/arm-none-eabi/14.2.0/"
+    ],
+    "cortex-debug.variableUseNaturalFormat": false,
+    "cortex-debug.armToolchainPath.linux": "/usr/bin",
+    "cortex-debug.JLinkGDBServerPath.linux": "/opt/SEGGER/JLink/JLinkGDBServerCLExe",
+    "mcu-debug.rtos-views.showRTOS": true,
+}

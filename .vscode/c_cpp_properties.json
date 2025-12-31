@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "ARM-GCC",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "_GNU_SOURCE",
+                "STM32F103xB",
+                "USE_FULL_LL_DRIVER",
+                "DEBUG"
+            ],
+            "compilerPath": "/usr/bin/arm-none-eabi-gcc",
+            "cStandard": "c23",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-arm",
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        }
+    ],
+    "version": 4
+}

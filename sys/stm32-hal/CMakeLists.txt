@@ -4,21 +4,18 @@ add_library(stm32f1xx_ll
     STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_dac.c
     STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_dma.c
     STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_exti.c
-    STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_fsmc.c
     STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_gpio.c
     STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_i2c.c
     STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_pwr.c
     STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_rcc.c
     STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_rtc.c
-    STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_sdmmc.c
     STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_spi.c
     STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_tim.c
     STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usart.c
-    STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c
     STM32CubeF1/Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_utils.c
-
-    STM32CubeF1/Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/gcc/startup_stm32f103xb.s
     STM32CubeF1/Drivers/CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c
+
+    startup_f103c8t6.s
 )
 
 add_library(stm32f1xx_cmsis INTERFACE)
@@ -38,7 +35,7 @@ target_compile_options(stm32f1xx_ll PRIVATE
 )
 
 target_link_libraries(stm32f1xx_ll PUBLIC
-    stm32f1xx_sys # stm32f1xx.h
+    stm32f1xx_cmsis
 )
 
 # Specify the linker script

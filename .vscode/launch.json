@@ -1,0 +1,25 @@
+{
+    "version": "1.0.0",
+    "configurations": [
+        {
+        "name": "JLink: debug current CMake build target (U5)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "servertype": "jlink",
+            "device": "STM32F103C8",
+            //"preLaunchTask": "$",
+            "interface": "swd",
+            "executable": "${command:cmake.launchTargetPath}",
+            //"rtos": "FreeRTOS",
+            "preLaunchCommands": [
+                "set output-radix 16", // use hexadecimal notation for variables by default
+                "set print pretty on", // prettify GDB output
+            ],
+            "liveWatch": {
+                "enabled": true,
+                "samplesPerSecond": 4
+            }
+        }
+    ]
+}
