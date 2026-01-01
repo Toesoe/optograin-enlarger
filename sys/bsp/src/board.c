@@ -117,6 +117,8 @@ void initBoard(void)
     bspEncoderInit(&g_encoderColumnConfig);
     bspMotorInit(&g_motorColumnConfig);
     bspMotorInit(&g_motorHeadConfig);
+
+    while (true);
     // bspLampInit(&g_lampConfig);
 }
 
@@ -130,11 +132,13 @@ void hwDelayMs(uint32_t ms)
 //=====================================================================================================================
 
 /**
- * @brief Configure system clock to 64 MHz from HSE + PLL
+ * @brief Configure system clock to 64 MHz
+ * 
+ * Tries HSE first (8 MHz crystal), falls back to HSI if unavailable
  * 
  * Clock tree:
- * - HSE: 8 MHz crystal
- * - PLL: HSE * 8 = 64 MHz
+ * - HSE: 8 MHz crystal (X50328MSB2GI, 20pF load) OR HSI: 8 MHz internal RC
+ * - PLL: Source * multiplier = 64 MHz
  * - SYSCLK: 64 MHz
  * - AHB: 64 MHz (no prescaler)
  * - APB1: 32 MHz (DIV2, max is 36 MHz)
@@ -145,12 +149,28 @@ static void initSysclock(void)
     // Configure flash latency for 64 MHz (2 wait states)
     LL_FLASH_SetLatency(LL_FLASH_LATENCY_2);
 
-    // Enable HSE (8 MHz external crystal)
+    // Try HSE first (8 MHz external crystal)
     LL_RCC_HSE_Enable();
-    while (LL_RCC_HSE_IsReady() != 1);
-
-    // Configure PLL: HSE * 8 = 64 MHz
-    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE_DIV_1, LL_RCC_PLL_MUL_8);
+    
+    // Wait with timeout
+    uint32_t timeout = 100000;
+    while (LL_RCC_HSE_IsReady() != 1 && --timeout > 0);
+    
+    if (timeout > 0)
+    {
+        // HSE ready - use crystal
+        LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE_DIV_1, LL_RCC_PLL_MUL_8);
+    }
+    else
+    {
+        // HSE failed - fall back to HSI
+        LL_RCC_HSE_Disable();
+        LL_RCC_HSI_Enable();
+        while (LL_RCC_HSI_IsReady() != 1);
+        LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSI_DIV_2, LL_RCC_PLL_MUL_16);
+    }
+    
+    // Configure and enable PLL
     LL_RCC_PLL_Enable();
     while (LL_RCC_PLL_IsReady() != 1);
 
