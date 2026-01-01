@@ -44,8 +44,7 @@ add_subdirectory(optograin)
 add_subdirectory(sys)
 
 target_link_libraries(${FW_ELF_FILE} PRIVATE
-    stm32f1xx_ll
-    stm32f1xx_cmsis
+    optograin_bsp
 )
 
 target_link_options(${FW_ELF_FILE} PRIVATE
