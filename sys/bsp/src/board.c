@@ -25,6 +25,7 @@
 #include <stm32f1xx_ll_bus.h>
 #include <stm32f1xx_ll_system.h>
 #include <stm32f1xx_ll_utils.h>
+#include "stm32f1xx_ll_exti.h"
 
 //=====================================================================================================================
 // Defines
@@ -38,18 +39,18 @@
 
 const SEncoderConfig_t g_encoderHeadConfig = {
     .pTimer = TIM2,
-    .aPin = {{ LL_GPIO_PIN_2, GPIOA }, false },
-    .bPin = {{ LL_GPIO_PIN_1, GPIOA }, false },
-    .zPin = {{ LL_GPIO_PIN_0, GPIOA }, false },
-    .aChannel = LL_TIM_CHANNEL_CH3,
-    .bChannel = LL_TIM_CHANNEL_CH2,
+    .aPin = {{ LL_GPIO_PIN_0, GPIOA }, false },  // PA0 = TIM2_CH1 (was Z, now A)
+    .bPin = {{ LL_GPIO_PIN_1, GPIOA }, false },  // PA1 = TIM2_CH2 (B)
+    .zPin = {{ LL_GPIO_PIN_2, GPIOA }, LL_EXTI_LINE_2 },  // PA2 moved to Z-index (was A)
+    .aChannel = LL_TIM_CHANNEL_CH1,  // Encoder mode requires CH1
+    .bChannel = LL_TIM_CHANNEL_CH2,  // Encoder mode requires CH2
 };
 
 const SEncoderConfig_t g_encoderColumnConfig = {
     .pTimer = TIM3,
     .aPin = {{ LL_GPIO_PIN_7, GPIOA }, false },
     .bPin = {{ LL_GPIO_PIN_6, GPIOA }, false },
-    .zPin = {{ LL_GPIO_PIN_5, GPIOA }, false },
+    .zPin = {{ LL_GPIO_PIN_5, GPIOA }, LL_EXTI_LINE_5 },
     .aChannel = LL_TIM_CHANNEL_CH2,
     .bChannel = LL_TIM_CHANNEL_CH1,
 };
@@ -63,6 +64,7 @@ const SMotorConfig_t g_motorColumnConfig = {
     .in2Channel = LL_TIM_CHANNEL_CH2,
     .useRemapPins = false,
     .invertDirection = false,
+    .minDutyPercent = 30,
 };
 
 const SMotorConfig_t g_motorHeadConfig = {
@@ -74,6 +76,7 @@ const SMotorConfig_t g_motorHeadConfig = {
     .in2Channel = LL_TIM_CHANNEL_CH4,
     .useRemapPins = false,
     .invertDirection = false,
+    .minDutyPercent = 59
 };
 
 const SLampConfig_t g_lampConfig = {
@@ -140,6 +143,8 @@ void initBoard(void)
     bspMotorInit(MOTOR_COLUMN, &g_motorColumnConfig);
     bspMotorInit(MOTOR_HEAD, &g_motorHeadConfig);
     bspLampInit(&g_lampConfig);
+
+    bspMotorEnable(true);
 
     SEGGER_RTT_WriteString(0, "BSP init complete");
 }

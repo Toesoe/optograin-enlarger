@@ -41,7 +41,7 @@ typedef struct
 
     SGenericGPIOPin_t aPin;
     SGenericGPIOPin_t bPin;
-    SGenericGPIOPin_t zPin;
+    SEXTIGPIOPin_t    zPin;
 
     uint32_t aChannel;  /**< TIM channel for A input */
     uint32_t bChannel;  /**< TIM channel for B input */
@@ -78,6 +78,19 @@ void bspEncoderReset(EEncoderId_t encoder);
 int16_t bspEncoderGetVelocity(EEncoderId_t encoder);
 
 bool bspEncoderIsHomed(EEncoderId_t encoder);
+
+/**
+ * @brief Clear homed flag without resetting counter
+ * @param encoder Encoder channel
+ */
+void bspEncoderClearHomedFlag(EEncoderId_t encoder);
+
+/**
+ * @brief Enable/disable auto-reset of counter on Z pulse
+ * @param encoder Encoder channel
+ * @param enable true = reset counter on Z pulse (for homing), false = only set flag
+ */
+void bspEncoderSetAutoResetOnZ(EEncoderId_t encoder, bool enable);
 
 #ifdef __cplusplus
 }

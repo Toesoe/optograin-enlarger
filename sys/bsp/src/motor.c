@@ -70,7 +70,7 @@ void bspMotorInit(EMotorId_t motorId, const SMotorConfig_t *pConfig)
     gpioInit.Mode                = LL_GPIO_MODE_ALTERNATE;
     gpioInit.Speed               = LL_GPIO_SPEED_FREQ_HIGH;
     gpioInit.OutputType          = LL_GPIO_OUTPUT_PUSHPULL;
-    gpioInit.Pull                = LL_GPIO_PULL_UP;
+    gpioInit.Pull                = LL_GPIO_PULL_DOWN;
 
     // IN1 pin
     gpioInit.Pin = pConfig->in1Pin.pinPort.pin;
@@ -79,6 +79,12 @@ void bspMotorInit(EMotorId_t motorId, const SMotorConfig_t *pConfig)
     // IN2 pin
     gpioInit.Pin = pConfig->in2Pin.pinPort.pin;
     LL_GPIO_Init(pConfig->in2Pin.pinPort.port, &gpioInit);
+
+    if (pConfig->useRemapPins)
+    {
+        // Remap TIM1 pins (partial remap)
+        LL_GPIO_AF_RemapPartial_TIM1();
+    }
 
     // Configure timer base (only once for TIM1)
     if (!LL_TIM_IsEnabledAllOutputs(pConfig->pTimer))
@@ -133,18 +139,20 @@ void bspMotorSetSpeed(EMotorId_t motor, int16_t speed)
     if (s_motorConfigs[motor]->invertDirection) speed = (int16_t)(-speed);
 
     uint32_t arr = LL_TIM_GetAutoReload(s_motorConfigs[motor]->pTimer);
+    uint32_t minDuty = (arr * s_motorConfigs[motor]->minDutyPercent) / 100;
 
     if (speed > 0)
     {
         // Forward: IN1=PWM, IN2=LOW
-        uint32_t duty = ((uint32_t)speed * arr) / SPEED_MAX;
+        // Map speed [1, SPEED_MAX] to duty [minDuty, arr]
+        uint32_t duty = minDuty + (((uint32_t)speed * (arr - minDuty)) / SPEED_MAX);
         setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in1Channel, duty);
         setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in2Channel, 0);
     }
     else if (speed < 0)
     {
         // Reverse: IN1=LOW, IN2=PWM
-        uint32_t duty = ((uint32_t)(-speed) * arr) / SPEED_MAX;
+        uint32_t duty = minDuty + (((uint32_t)(-speed) * (arr - minDuty)) / SPEED_MAX);
         setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in1Channel, 0);
         setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in2Channel, duty);
     }

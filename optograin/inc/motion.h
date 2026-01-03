@@ -51,6 +51,8 @@ float motionGetHeadVelocity_mmps(void);
 
 // Calibration
 void motionStartCalibration(void);
+void motionSetCalibrationStartHead(int32_t count);
+void motionSetCalibrationStartColumn(int32_t count);
 void motionCalibrateColumn_mm(float distance_mm);
 void motionCalibrateHead_mm(float distance_mm);
 void motionSaveCalibration(void);

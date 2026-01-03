@@ -39,31 +39,9 @@ typedef struct
 /** @brief EXTI mapped GPIO pin/port definition */
 typedef struct
 {
-    SGPIOPin_t gpio;
+    SGPIOPin_t pinPort;
     uint32_t extiLine;
-    uint32_t extiPort;
 } SEXTIGPIOPin_t;
-
-//=====================================================================================================================
-// Inline Helpers
-//=====================================================================================================================
-
-/**
- * @brief Convert LL_GPIO_PIN_x to LL_EXTI_LINE_x
- * @param gpioPin GPIO pin bitmask (LL_GPIO_PIN_0, LL_GPIO_PIN_5, etc.)
- * @return EXTI line value (LL_EXTI_LINE_0, LL_EXTI_LINE_5, etc.)
- */
-static inline uint32_t gpioPinToExtiLine(uint32_t gpioPin)
-{
-    // LL_GPIO_PIN_n is a bitmask (1 << n), find bit position
-    uint32_t line = 0;
-    while (gpioPin > 1)
-    {
-        gpioPin >>= 1;
-        line++;
-    }
-    return (1U << line);  // LL_EXTI_LINE_x format
-}
 
 //=====================================================================================================================
 // Functions

@@ -75,6 +75,7 @@ typedef struct
     bool              useRemapPins;
 
     bool              invertDirection;
+    uint8_t           minDutyPercent; /**< Minimum duty cycle (0-100) to overcome deadband/friction */
 } SMotorConfig_t;
 
 //=====================================================================================================================
