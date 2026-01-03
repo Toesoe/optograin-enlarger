@@ -40,15 +40,18 @@ add_compile_definitions(
     $<$<CONFIG:Debug>:DEBUG>
 )
 
-add_subdirectory(optograin)
+add_subdirectory(lib)
 add_subdirectory(sys)
+add_subdirectory(optograin)
 
 target_link_libraries(${FW_ELF_FILE} PRIVATE
     optograin_bsp
+    segger_rtt
 )
 
 target_link_options(${FW_ELF_FILE} PRIVATE
     -Wl,-Map=${FW_MAP_FILE},--cref
+    -Wl,--no-warn-rwx-segment
 )
 
 

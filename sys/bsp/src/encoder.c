@@ -16,31 +16,42 @@
 #include <stm32f1xx_ll_tim.h>
 
 //=====================================================================================================================
-// Private Data
+// Private types
 //=====================================================================================================================
 
-static TIM_TypeDef *s_encoderTimers[ENCODER_COUNT]   = { NULL };
-static int32_t      s_encoderOverflow[ENCODER_COUNT] = { 0 };
-static int32_t      s_lastCount[ENCODER_COUNT]       = { 0 };
-static uint32_t     s_lastTimestamp[ENCODER_COUNT]   = { 0 };
-static bool         s_homed[ENCODER_COUNT]           = { false };
-
-//=====================================================================================================================
-// Functions
-//=====================================================================================================================
-
-void bspEncoderInit(const SEncoderConfig_t *pEncoderConfig)
+typedef struct
 {
-    if (!pEncoderConfig || pEncoderConfig->encoderId >= ENCODER_COUNT) return;
+    const SEncoderConfig_t *pConfig;
+    volatile int32_t        overflowCount; // extends 16-bit timer to 32-bit
+    volatile bool           isHomed;
+    int32_t                 lastCount;
+    uint32_t                lastTimestamp;
+} SEncoderState_t;
 
-    TIM_TypeDef *pTimer                        = pEncoderConfig->pTimer;
-    s_encoderTimers[pEncoderConfig->encoderId] = pTimer;
+//=====================================================================================================================
+// Private data
+//=====================================================================================================================
 
+static SEncoderState_t gs_encoderStates[ENCODER_COUNT] = { 0 };
+
+//=====================================================================================================================
+// Public functions
+//=====================================================================================================================
+
+void bspEncoderInit(EEncoderId_t encoderId, const SEncoderConfig_t *pEncoderConfig)
+{
+    if (!pEncoderConfig || (encoderId >= ENCODER_COUNT)) return;
+
+    gs_encoderStates[encoderId].pConfig = pEncoderConfig;
     // Enable timer clock
-    if (pTimer == TIM2)
+    if (gs_encoderStates[encoderId].pConfig->pTimer == TIM2)
+    {
         LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM2);
-    else if (pTimer == TIM3)
+    }
+    else if (gs_encoderStates[encoderId].pConfig->pTimer == TIM3)
+    {
         LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM3);
+    }
 
     // Configure GPIO pins as alternate function inputs
     LL_GPIO_InitTypeDef gpioInit = { 0 };
@@ -56,29 +67,32 @@ void bspEncoderInit(const SEncoderConfig_t *pEncoderConfig)
     LL_GPIO_Init(pEncoderConfig->bPin.pinPort.port, &gpioInit);
 
     // Configure timer in encoder mode
-    LL_TIM_SetEncoderMode(pTimer, LL_TIM_ENCODERMODE_X4_TI12);
+    LL_TIM_SetEncoderMode(pEncoderConfig->pTimer, LL_TIM_ENCODERMODE_X4_TI12);
 
     // Configure input channels
-    LL_TIM_IC_SetActiveInput(pTimer, LL_TIM_CHANNEL_CH1, LL_TIM_ACTIVEINPUT_DIRECTTI);
-    LL_TIM_IC_SetActiveInput(pTimer, LL_TIM_CHANNEL_CH2, LL_TIM_ACTIVEINPUT_DIRECTTI);
+    LL_TIM_IC_SetActiveInput(pEncoderConfig->pTimer, pEncoderConfig->aChannel, LL_TIM_ACTIVEINPUT_DIRECTTI);
+    LL_TIM_IC_SetActiveInput(pEncoderConfig->pTimer, pEncoderConfig->bChannel, LL_TIM_ACTIVEINPUT_DIRECTTI);
+    LL_TIM_IC_SetPolarity(pEncoderConfig->pTimer, pEncoderConfig->aChannel, LL_TIM_IC_POLARITY_RISING);
+    LL_TIM_IC_SetPolarity(pEncoderConfig->pTimer, pEncoderConfig->bChannel, LL_TIM_IC_POLARITY_RISING);
 
-    LL_TIM_IC_SetPolarity(pTimer, LL_TIM_CHANNEL_CH1, LL_TIM_IC_POLARITY_RISING);
-    LL_TIM_IC_SetPolarity(pTimer, LL_TIM_CHANNEL_CH2, LL_TIM_IC_POLARITY_RISING);
-
-    LL_TIM_IC_SetFilter(pTimer, LL_TIM_CHANNEL_CH1, LL_TIM_IC_FILTER_FDIV1_N2);
-    LL_TIM_IC_SetFilter(pTimer, LL_TIM_CHANNEL_CH2, LL_TIM_IC_FILTER_FDIV1_N2);
+    LL_TIM_IC_SetFilter(pEncoderConfig->pTimer, pEncoderConfig->aChannel, LL_TIM_IC_FILTER_FDIV1_N2);
+    LL_TIM_IC_SetFilter(pEncoderConfig->pTimer, pEncoderConfig->bChannel, LL_TIM_IC_FILTER_FDIV1_N2);
 
     // Set counter to mid-range to detect both directions
-    LL_TIM_SetAutoReload(pTimer, 0xFFFF);
-    LL_TIM_SetCounter(pTimer, 0x8000);
+    LL_TIM_SetAutoReload(pEncoderConfig->pTimer, 0xFFFF);
+    LL_TIM_SetCounter(pEncoderConfig->pTimer, 0x8000);
 
     // Enable update interrupt for overflow tracking
-    LL_TIM_EnableIT_UPDATE(pTimer);
+    LL_TIM_EnableIT_UPDATE(pEncoderConfig->pTimer);
 
-    if (pTimer == TIM2)
+    if (pEncoderConfig->pTimer == TIM2)
+    {
         NVIC_EnableIRQ(TIM2_IRQn);
-    else if (pTimer == TIM3)
+    }
+    else if (pEncoderConfig->pTimer == TIM3)
+    {
         NVIC_EnableIRQ(TIM3_IRQn);
+    }
 
     // Configure Z-index pin for homing (if present)
     if (pEncoderConfig->zPin.pinPort.pin != 0)
@@ -89,33 +103,35 @@ void bspEncoderInit(const SEncoderConfig_t *pEncoderConfig)
         LL_GPIO_Init(pEncoderConfig->zPin.pinPort.port, &zInit);
 
         // Enable EXTI for rising edge (Z pulse)
+        uint32_t extiLine = gpioPinToExtiLine(pEncoderConfig->zPin.pinPort.pin);
+        LL_EXTI_EnableIT_0_31(extiLine);
+        LL_EXTI_EnableRisingTrig_0_31(extiLine);
+        
+        // Enable appropriate EXTI IRQ
         if (pEncoderConfig->zPin.pinPort.pin == LL_GPIO_PIN_0)
         {
-            LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_0);
-            LL_EXTI_EnableRisingTrig_0_31(LL_EXTI_LINE_0);
             NVIC_EnableIRQ(EXTI0_IRQn);
         }
-        else if (pEncoderConfig->zPin.pinPort.pin == LL_GPIO_PIN_5)
+        else if (pEncoderConfig->zPin.pinPort.pin >= LL_GPIO_PIN_5 && 
+                 pEncoderConfig->zPin.pinPort.pin <= LL_GPIO_PIN_9)
         {
-            LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_5);
-            LL_EXTI_EnableRisingTrig_0_31(LL_EXTI_LINE_5);
             NVIC_EnableIRQ(EXTI9_5_IRQn);
         }
     }
 
     // Start encoder
-    LL_TIM_EnableCounter(pTimer);
+    LL_TIM_EnableCounter(pEncoderConfig->pTimer);
 }
 
 int32_t bspEncoderGetCount(EEncoderId_t encoder)
 {
-    if (encoder >= ENCODER_COUNT || !s_encoderTimers[encoder]) return 0;
+    if (encoder >= ENCODER_COUNT || !gs_encoderStates[encoder].pConfig->pTimer) return 0;
 
-    TIM_TypeDef *pTimer = s_encoderTimers[encoder];
+    TIM_TypeDef *pTimer = gs_encoderStates[encoder].pConfig->pTimer;
     uint32_t     cnt    = LL_TIM_GetCounter(pTimer);
 
     // Combine overflow counter with hardware counter
-    int32_t fullCount = (s_encoderOverflow[encoder] << 16) | (cnt & 0xFFFF);
+    int32_t fullCount = ((gs_encoderStates[encoder].overflowCount << 16) | (int32_t)(cnt & 0xFFFF));
 
     // Subtract initial offset (0x8000) to make zero-centered
     return fullCount - 0x8000;
@@ -123,36 +139,46 @@ int32_t bspEncoderGetCount(EEncoderId_t encoder)
 
 void bspEncoderReset(EEncoderId_t encoder)
 {
-    if (encoder >= ENCODER_COUNT || !s_encoderTimers[encoder]) return;
+    if (encoder >= ENCODER_COUNT || !gs_encoderStates[encoder].pConfig->pTimer) return;
 
-    s_encoderOverflow[encoder] = 0;
-    s_lastCount[encoder]       = 0;
-    s_homed[encoder]           = false;
-    LL_TIM_SetCounter(s_encoderTimers[encoder], 0x8000);
+    gs_encoderStates[encoder].overflowCount = 0;
+    gs_encoderStates[encoder].lastCount       = 0;
+    gs_encoderStates[encoder].isHomed           = false;
+    LL_TIM_SetCounter(gs_encoderStates[encoder].pConfig->pTimer, 0x8000);
 }
 
 int16_t bspEncoderGetVelocity(EEncoderId_t encoder)
 {
-    if (encoder >= ENCODER_COUNT || !s_encoderTimers[encoder]) return 0;
+    if (encoder >= ENCODER_COUNT || !gs_encoderStates[encoder].pConfig->pTimer) return 0;
 
     int32_t  currentCount    = bspEncoderGetCount(encoder);
     uint32_t currentTime     = LL_TIM_GetCounter(TIM4); // Assuming TIM4 is 1ms tick
 
-    int32_t  deltaCounts     = currentCount - s_lastCount[encoder];
-    int32_t  deltaTime       = (int32_t)(currentTime - s_lastTimestamp[encoder]);
+    int32_t  deltaCounts     = currentCount - gs_encoderStates[encoder].lastCount;
+    int32_t  deltaTime       = (int32_t)(currentTime - gs_encoderStates[encoder].lastTimestamp);
 
-    s_lastCount[encoder]     = currentCount;
-    s_lastTimestamp[encoder] = currentTime;
-
+    gs_encoderStates[encoder].lastCount     = currentCount;
+    gs_encoderStates[encoder].lastTimestamp = currentTime;
     if (deltaTime == 0) return 0;
 
     // Return counts per millisecond
     return (int16_t)(deltaCounts / deltaTime);
 }
 
+bool bspEncoderIsHomed(EEncoderId_t encoder)
+{
+    if (encoder >= ENCODER_COUNT)
+        return false;
+    
+    return gs_encoderStates[encoder].isHomed;
+}
+
 //=====================================================================================================================
 // IRQ Handlers (prototypes in startup file)
 //=====================================================================================================================
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-prototypes"
 
 void __attribute__((used)) TIM2_IRQHandler(void)
 {
@@ -162,9 +188,13 @@ void __attribute__((used)) TIM2_IRQHandler(void)
 
         // Track overflow/underflow
         if (LL_TIM_GetDirection(TIM2) == LL_TIM_COUNTERDIRECTION_UP)
-            s_encoderOverflow[ENCODER_HEAD]++;
+        {
+            gs_encoderStates[ENCODER_HEAD].overflowCount++;
+        }
         else
-            s_encoderOverflow[ENCODER_HEAD]--;
+        {
+            gs_encoderStates[ENCODER_HEAD].overflowCount--;
+        }
     }
 }
 
@@ -176,9 +206,13 @@ void __attribute__((used)) TIM3_IRQHandler(void)
 
         // Track overflow/underflow
         if (LL_TIM_GetDirection(TIM3) == LL_TIM_COUNTERDIRECTION_UP)
-            s_encoderOverflow[ENCODER_COLUMN]++;
+        {
+            gs_encoderStates[ENCODER_COLUMN].overflowCount++;
+        }
         else
-            s_encoderOverflow[ENCODER_COLUMN]--;
+        {
+            gs_encoderStates[ENCODER_COLUMN].overflowCount--;
+        }
     }
 }
 
@@ -190,9 +224,9 @@ void __attribute__((used)) EXTI0_IRQHandler(void)
 
         // Z-index pulse detected on head encoder (PA0)
         // Reset counter to zero for homing
-        s_encoderOverflow[ENCODER_HEAD] = 0;
+        gs_encoderStates[ENCODER_HEAD].overflowCount = 0;
         LL_TIM_SetCounter(TIM2, 0x8000);
-        s_homed[ENCODER_HEAD] = true;
+        gs_encoderStates[ENCODER_HEAD].isHomed = true;
     }
 }
 
@@ -204,8 +238,10 @@ void __attribute__((used)) EXTI9_5_IRQHandler(void)
 
         // Z-index pulse detected on column encoder (PA5)
         // Reset counter to zero for homing
-        s_encoderOverflow[ENCODER_COLUMN] = 0;
+        gs_encoderStates[ENCODER_COLUMN].overflowCount = 0;
         LL_TIM_SetCounter(TIM3, 0x8000);
-        s_homed[ENCODER_COLUMN] = true;
+        gs_encoderStates[ENCODER_COLUMN].isHomed = true;
     }
 }
+
+#pragma GCC diagnostic pop

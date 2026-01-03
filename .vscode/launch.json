@@ -19,6 +19,17 @@
             "liveWatch": {
                 "enabled": true,
                 "samplesPerSecond": 4
+            },
+            "rttConfig": {
+                "enabled": true,
+                "address": "auto",
+                "decoders": [
+                    {
+                        "label": "",
+                        "port": 0,
+                        "type": "console"
+                    }
+                ]
             }
         }
     ]

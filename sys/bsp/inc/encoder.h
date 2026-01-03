@@ -37,12 +37,14 @@ typedef enum
 
 typedef struct
 {
-    EEncoderId_t encoderId;
     TIM_TypeDef *pTimer;
 
     SGenericGPIOPin_t aPin;
     SGenericGPIOPin_t bPin;
     SGenericGPIOPin_t zPin;
+
+    uint32_t aChannel;  /**< TIM channel for A input */
+    uint32_t bChannel;  /**< TIM channel for B input */
 } SEncoderConfig_t;
 
 //=====================================================================================================================
@@ -53,7 +55,7 @@ typedef struct
  * @brief Initialize encoder timer in quadrature decoder mode
  * @param pEncoderConfig Encoder channel to initialize
  */
-void bspEncoderInit(const SEncoderConfig_t *pEncoderConfig);
+void bspEncoderInit(EEncoderId_t encoder, const SEncoderConfig_t *pEncoderConfig);
 
 /**
  * @brief Get current encoder position
@@ -74,6 +76,8 @@ void bspEncoderReset(EEncoderId_t encoder);
  * @return Velocity in counts per millisecond
  */
 int16_t bspEncoderGetVelocity(EEncoderId_t encoder);
+
+bool bspEncoderIsHomed(EEncoderId_t encoder);
 
 #ifdef __cplusplus
 }

@@ -1,17 +1,17 @@
 /**
  * @file motor.h
  * @brief Motor control interface for enlarger positioning
- * 
- * Hardware: 
+ *
+ * Hardware:
  * - 2x DRV8871DA brushed DC motor drivers (H-bridge)
  * - TIM1 PWM generation (all 4 channels)
- * 
+ *
  * Control Method (per DRV8871):
  * - Forward:  IN1=PWM, IN2=LOW
  * - Reverse:  IN1=LOW, IN2=PWM
  * - Brake:    IN1=HIGH, IN2=HIGH
  * - Coast:    IN1=LOW, IN2=LOW
- * 
+ *
  * Pin Allocation (after bodge):
  * - Column Motor: PA8 (TIM1_CH1/IN1), PA9 (TIM1_CH2/IN2)
  * - Head Motor:   PA10 (TIM1_CH3/IN1), PA11 (TIM1_CH4/IN2)
@@ -38,11 +38,10 @@ extern "C"
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stm32f1xx_ll_gpio.h>
+#include <stm32f1xx_ll_tim.h>
 
 #include "board.h"
-
-#include <stm32f1xx_ll_tim.h>
-#include <stm32f1xx_ll_gpio.h>
 
 //=====================================================================================================================
 // Types
@@ -51,31 +50,31 @@ extern "C"
 /** @brief Motor identifiers */
 typedef enum
 {
-    MOTOR_COLUMN = 0,    /**< Column motor (TIM1_CH1/CH2 → DRV8871 #1) */
-    MOTOR_HEAD,          /**< Head/lens motor (TIM1_CH3/CH4 → DRV8871 #2) */
+    MOTOR_COLUMN = 0, /**< Column motor (TIM1_CH1/CH2 → DRV8871 #1) */
+    MOTOR_HEAD,       /**< Head/lens motor (TIM1_CH3/CH4 → DRV8871 #2) */
     MOTOR_COUNT
 } EMotorId_t;
 
 /** @brief Motor brake mode */
 typedef enum
 {
-    MOTOR_BRAKE_COAST = 0,  /**< Low-side coast (both IN pins LOW) */
-    MOTOR_BRAKE_ACTIVE,     /**< Active brake (both IN pins HIGH) */
+    MOTOR_BRAKE_COAST = 0, /**< Low-side coast (both IN pins LOW) */
+    MOTOR_BRAKE_ACTIVE,    /**< Active brake (both IN pins HIGH) */
 } EMotorBrakeMode_t;
 
 /** @brief Motor hardware configuration */
 typedef struct
 {
-    EMotorId_t motorId;
-    TIM_TypeDef *pTimer;
-
-    uint32_t pwmFrequency;        /**< PWM frequency in Hz (typically 20-25 kHz) */
+    TIM_TypeDef      *pTimer;
+    uint32_t          pwmFrequency; /**< PWM frequency in Hz (typically 20-25 kHz) */
 
     SGenericGPIOPin_t in1Pin;
     SGenericGPIOPin_t in2Pin;
-    bool useRemapPins;
+    uint32_t          in1Channel; /**< TIM channel for IN1 pin */
+    uint32_t          in2Channel; /**< TIM channel for IN2 pin */
+    bool              useRemapPins;
 
-    bool invertDirection;
+    bool              invertDirection;
 } SMotorConfig_t;
 
 //=====================================================================================================================
@@ -88,7 +87,7 @@ typedef struct
  * @param config Motor configuration (defined in board.h)
  * Default: Motors disabled, coast mode
  */
-void bspMotorInit(const SMotorConfig_t *config);
+void bspMotorInit(EMotorId_t motorId, const SMotorConfig_t *config);
 
 /**
  * @brief Set motor speed and direction

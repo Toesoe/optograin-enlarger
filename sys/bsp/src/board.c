@@ -14,6 +14,10 @@
 #include "lamp.h"
 #include "motor.h"
 
+#include "uart.h"
+
+#include "SEGGER_RTT.h"
+
 #include <stm32f1xx.h>
 #include <stm32f1xx_ll_rcc.h>
 #include <stm32f1xx_ll_gpio.h>
@@ -33,57 +37,71 @@
 //=====================================================================================================================
 
 const SEncoderConfig_t g_encoderHeadConfig = {
-    .encoderId = ENCODER_HEAD,
-    .pTimer = TIM2,  // PA1 (TIM2_CH2/B), PA2 (TIM2_CH3/A),
+    .pTimer = TIM2,
     .aPin = {{ LL_GPIO_PIN_2, GPIOA }, false },
     .bPin = {{ LL_GPIO_PIN_1, GPIOA }, false },
     .zPin = {{ LL_GPIO_PIN_0, GPIOA }, false },
+    .aChannel = LL_TIM_CHANNEL_CH3,
+    .bChannel = LL_TIM_CHANNEL_CH2,
 };
 
 const SEncoderConfig_t g_encoderColumnConfig = {
-    .encoderId = ENCODER_COLUMN,
-    .pTimer = TIM3,  // PA6 (TIM3_CH1/A), PA7 (TIM3_CH2/B)
+    .pTimer = TIM3,
     .aPin = {{ LL_GPIO_PIN_7, GPIOA }, false },
     .bPin = {{ LL_GPIO_PIN_6, GPIOA }, false },
     .zPin = {{ LL_GPIO_PIN_5, GPIOA }, false },
+    .aChannel = LL_TIM_CHANNEL_CH2,
+    .bChannel = LL_TIM_CHANNEL_CH1,
 };
 
 const SMotorConfig_t g_motorColumnConfig = {
-    .motorId = MOTOR_COLUMN,
     .pTimer = TIM1,
     .pwmFrequency = 25000,        // 25 kHz
     .in1Pin = {{ LL_GPIO_PIN_8, GPIOA }, false },
     .in2Pin = {{ LL_GPIO_PIN_9, GPIOA }, false },
+    .in1Channel = LL_TIM_CHANNEL_CH1,
+    .in2Channel = LL_TIM_CHANNEL_CH2,
     .useRemapPins = false,
     .invertDirection = false,
 };
 
 const SMotorConfig_t g_motorHeadConfig = {
-    .motorId = MOTOR_HEAD,
     .pTimer = TIM1,
     .pwmFrequency = 25000,        // 25 kHz
     .in1Pin = {{ LL_GPIO_PIN_10, GPIOA }, false },
     .in2Pin = {{ LL_GPIO_PIN_11, GPIOA }, false },
+    .in1Channel = LL_TIM_CHANNEL_CH3,
+    .in2Channel = LL_TIM_CHANNEL_CH4,
     .useRemapPins = false,
     .invertDirection = false,
 };
 
 const SLampConfig_t g_lampConfig = {
     .pTimer = TIM4,
-    .controlPin = {{ LL_GPIO_PIN_12, GPIOB }, true }, // PB12
+    .controlPin = {{ LL_GPIO_PIN_12, GPIOB }, true }, // PB12 output
+};
+
+const SUartConfig_t g_uart1Config = {
+    .pUsart = USART1,
+    .txPin = { { LL_GPIO_PIN_6, GPIOB }, false },
+    .rxPin = { { LL_GPIO_PIN_7, GPIOB }, false },
+    .remapAlternateFunction = true, // use PB6/PB7 instead of PA9/PA10
+    .baudRate = 460800,
+    .dataBits = 8,
+    .stopBits = 1
 };
 
 // plain old GPIOs
 SGenericGPIOPin_t g_fanTachPin = { { LL_GPIO_PIN_14, GPIOB}, false };
-SGenericGPIOPin_t g_fanPwmPin = { { LL_GPIO_PIN_13, GPIOB }, true };
+SGenericGPIOPin_t g_fanPwmPin = { { LL_GPIO_PIN_13, GPIOB }, true }; // softpwm
 
-SGenericGPIOPin_t g_turretSwitchA = { { LL_GPIO_PIN_8, GPIOB }, false }; // note: rewired, find correct pin
-SGenericGPIOPin_t g_turretSwitchB = { { LL_GPIO_PIN_9, GPIOB }, false };
+SGenericGPIOPin_t g_turretSwitchA = { { LL_GPIO_PIN_1, GPIOB }, false }; 
+SGenericGPIOPin_t g_turretSwitchB = { { LL_GPIO_PIN_15, GPIOB }, false };
 
-SGenericGPIOPin_t g_headLimitTop = { { LL_GPIO_PIN_15, GPIOA }, false }; // note: rewired, find correct pin
-SGenericGPIOPin_t g_headLimitBottom = { { LL_GPIO_PIN_15, GPIOA }, false }; // note: rewired, find correct pin
-SGenericGPIOPin_t g_columnLimitTop = { { LL_GPIO_PIN_15, GPIOA }, false };
-SGenericGPIOPin_t g_columnLimitBottom = { { LL_GPIO_PIN_15, GPIOA }, false }; // note: rewired, find correct pin
+SGenericGPIOPin_t g_headLimitTop = { { LL_GPIO_PIN_0, GPIOB }, false };
+SGenericGPIOPin_t g_headLimitBottom = { { LL_GPIO_PIN_2, GPIOB }, false };
+SGenericGPIOPin_t g_columnLimitTop = { { LL_GPIO_PIN_12, GPIOA }, false };
+SGenericGPIOPin_t g_columnLimitBottom = { { LL_GPIO_PIN_11, GPIOB }, false };
 
 //=====================================================================================================================
 // Protos
@@ -113,13 +131,17 @@ void initBoard(void)
     LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOA);
     LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOB);
 
-    bspEncoderInit(&g_encoderHeadConfig);
-    bspEncoderInit(&g_encoderColumnConfig);
-    bspMotorInit(&g_motorColumnConfig);
-    bspMotorInit(&g_motorHeadConfig);
+    SEGGER_RTT_Init();
 
-    while (true);
-    // bspLampInit(&g_lampConfig);
+    bspUartInit(&g_uart1Config);
+
+    bspEncoderInit(ENCODER_HEAD, &g_encoderHeadConfig);
+    bspEncoderInit(ENCODER_COLUMN, &g_encoderColumnConfig);
+    bspMotorInit(MOTOR_COLUMN, &g_motorColumnConfig);
+    bspMotorInit(MOTOR_HEAD, &g_motorHeadConfig);
+    bspLampInit(&g_lampConfig);
+
+    SEGGER_RTT_WriteString(0, "BSP init complete");
 }
 
 void hwDelayMs(uint32_t ms)
@@ -158,7 +180,6 @@ static void initSysclock(void)
     
     if (timeout > 0)
     {
-        // HSE ready - use crystal
         LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE_DIV_1, LL_RCC_PLL_MUL_8);
     }
     else

@@ -49,7 +49,7 @@ typedef struct
 // Functions
 //=====================================================================================================================
 
-void initUsart(SUartConfig_t *);
+void bspUartInit(const SUartConfig_t *);
 
 void toggleUsartRX(bool);
 

@@ -50,7 +50,7 @@
  * 
  * @note USARTs have their RX channel disabled on startup to prevent firing RX interrupts
  */
-void initUsart(SUartConfig_t *pPeripheralConfig)
+void bspUartInit(const SUartConfig_t *pPeripheralConfig)
 {
     USART_TypeDef *pPeripheral = pPeripheralConfig->pUsart;
     uint32_t baudrate = pPeripheralConfig->baudRate;
@@ -58,7 +58,7 @@ void initUsart(SUartConfig_t *pPeripheralConfig)
     // Enable GPIO clocks
     if (pPeripheral == USART1)
     {
-        LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOA);
+        LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_USART1);
         if (pPeripheralConfig->remapAlternateFunction)
         {
             LL_GPIO_AF_EnableRemap_USART1();
@@ -66,10 +66,18 @@ void initUsart(SUartConfig_t *pPeripheralConfig)
     }
     else if (pPeripheral == USART2)
     {
-        LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_GPIOA);
+        LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_USART2);
         if (pPeripheralConfig->remapAlternateFunction)
         {
             LL_GPIO_AF_EnableRemap_USART2();
+        }
+    }
+    else if (pPeripheral == USART3)
+    {
+        LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_USART3);
+        if (pPeripheralConfig->remapAlternateFunction)
+        {
+            LL_GPIO_AF_EnableRemap_USART3();
         }
     }
 
@@ -80,23 +88,25 @@ void initUsart(SUartConfig_t *pPeripheralConfig)
     LL_GPIO_SetPinPull(pPeripheralConfig->txPin.pinPort.port, pPeripheralConfig->txPin.pinPort.pin, LL_GPIO_PULL_UP);
 
     // Configure RX pin
-    LL_GPIO_SetPinMode(pPeripheralConfig->rxPin.pinPort.port, pPeripheralConfig->rxPin.pinPort.pin, LL_GPIO_MODE_FLOATING);
+    LL_GPIO_SetPinMode(pPeripheralConfig->rxPin.pinPort.port, pPeripheralConfig->rxPin.pinPort.pin, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetPinSpeed(pPeripheralConfig->rxPin.pinPort.port, pPeripheralConfig->rxPin.pinPort.pin, LL_GPIO_SPEED_FREQ_HIGH);
     LL_GPIO_SetPinPull(pPeripheralConfig->rxPin.pinPort.port, pPeripheralConfig->rxPin.pinPort.pin, LL_GPIO_PULL_UP);
 
-    // Enable USART clock and configure
+    // USART1 is APB2 at 64MHz, USART2/3 are APB1 at 32MHz
     if (pPeripheral == USART1)
     {
         NVIC_EnableIRQ(USART1_IRQn);
-        LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_USART1);
-        LL_USART_SetBaudRate(pPeripheral, SystemCoreClock/2, baudrate);
-        
+        LL_USART_SetBaudRate(pPeripheral, SystemCoreClock, baudrate);
     }
     else if (pPeripheral == USART2)
     {
         NVIC_EnableIRQ(USART2_IRQn);
-        LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_USART2);
-        LL_USART_SetBaudRate(pPeripheral, SystemCoreClock, baudrate);
+        LL_USART_SetBaudRate(pPeripheral, SystemCoreClock/2, baudrate);
+    }
+    else if (pPeripheral == USART3)
+    {
+        NVIC_EnableIRQ(USART3_IRQn);
+        LL_USART_SetBaudRate(pPeripheral, SystemCoreClock/2, baudrate);
     }
 
     LL_USART_SetTransferDirection(pPeripheral, LL_USART_DIRECTION_TX_RX);
