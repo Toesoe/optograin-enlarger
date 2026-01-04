@@ -42,9 +42,6 @@ typedef struct
     SGenericGPIOPin_t aPin;
     SGenericGPIOPin_t bPin;
     SEXTIGPIOPin_t    zPin;
-
-    uint32_t aChannel;  /**< TIM channel for A input */
-    uint32_t bChannel;  /**< TIM channel for B input */
 } SEncoderConfig_t;
 
 //=====================================================================================================================
@@ -75,15 +72,21 @@ void bspEncoderReset(EEncoderId_t encoder);
  * @param encoder Encoder channel
  * @return Velocity in counts per millisecond
  */
-int16_t bspEncoderGetVelocity(EEncoderId_t encoder);
-
-bool bspEncoderIsHomed(EEncoderId_t encoder);
+int32_t bspEncoderGetVelocity(EEncoderId_t encoder);
 
 /**
- * @brief Clear homed flag without resetting counter
+ * @brief Check if Z-index reference has been found
+ * @param encoder Encoder channel
+ * @return true if Z-index pulse has been detected since init/reset
+ * @note This only indicates encoder sync, not machine homing status
+ */
+bool bspEncoderHasZIndexReference(EEncoderId_t encoder);
+
+/**
+ * @brief Clear Z-index reference flag without resetting counter
  * @param encoder Encoder channel
  */
-void bspEncoderClearHomedFlag(EEncoderId_t encoder);
+void bspEncoderClearZIndexReference(EEncoderId_t encoder);
 
 /**
  * @brief Enable/disable auto-reset of counter on Z pulse

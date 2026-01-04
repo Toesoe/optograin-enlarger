@@ -62,21 +62,17 @@ void bspMotorInit(EMotorId_t motorId, const SMotorConfig_t *pConfig)
 
     s_motorConfigs[motorId] = pConfig;
 
-    // Enable timer clock (TIM1 is on APB2)
     LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_TIM1);
 
-    // Configure GPIO pins as alternate function push-pull
     LL_GPIO_InitTypeDef gpioInit = { 0 };
     gpioInit.Mode                = LL_GPIO_MODE_ALTERNATE;
     gpioInit.Speed               = LL_GPIO_SPEED_FREQ_HIGH;
     gpioInit.OutputType          = LL_GPIO_OUTPUT_PUSHPULL;
     gpioInit.Pull                = LL_GPIO_PULL_DOWN;
 
-    // IN1 pin
     gpioInit.Pin = pConfig->in1Pin.pinPort.pin;
     LL_GPIO_Init(pConfig->in1Pin.pinPort.port, &gpioInit);
 
-    // IN2 pin
     gpioInit.Pin = pConfig->in2Pin.pinPort.pin;
     LL_GPIO_Init(pConfig->in2Pin.pinPort.port, &gpioInit);
 
@@ -89,7 +85,7 @@ void bspMotorInit(EMotorId_t motorId, const SMotorConfig_t *pConfig)
     // Configure timer base (only once for TIM1)
     if (!LL_TIM_IsEnabledAllOutputs(pConfig->pTimer))
     {
-        LL_TIM_SetPrescaler(pConfig->pTimer, 0); // No prescaler, full 64 MHz
+        LL_TIM_SetPrescaler(pConfig->pTimer, 0);
 
         // ARR = (Timer Clock / PWM Frequency) - 1
         // 64 MHz / 25 kHz = 2560
@@ -143,24 +139,25 @@ void bspMotorSetSpeed(EMotorId_t motor, int16_t speed)
 
     if (speed > 0)
     {
-        // Forward: IN1=PWM, IN2=LOW
-        // Map speed [1, SPEED_MAX] to duty [minDuty, arr]
-        uint32_t duty = minDuty + (((uint32_t)speed * (arr - minDuty)) / SPEED_MAX);
-        setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in1Channel, duty);
-        setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in2Channel, 0);
+        // Forward IN1=HIGH, IN2=PWM (inverted duty)
+        uint32_t pwmDuty = minDuty + (((uint32_t)speed * (arr - minDuty)) / SPEED_MAX);
+
+        setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in1Channel, arr);
+        setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in2Channel, arr - pwmDuty);
     }
     else if (speed < 0)
     {
-        // Reverse: IN1=LOW, IN2=PWM
-        uint32_t duty = minDuty + (((uint32_t)(-speed) * (arr - minDuty)) / SPEED_MAX);
-        setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in1Channel, 0);
-        setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in2Channel, duty);
+        // Reverse IN1=PWM, IN2=HIGH
+        uint32_t pwmDuty = minDuty + (((uint32_t)(-speed) * (arr - minDuty)) / SPEED_MAX);
+
+        setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in1Channel, arr - pwmDuty);
+        setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in2Channel, arr);
     }
     else
     {
-        // Stop: coast mode (both LOW)
-        setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in1Channel, 0);
-        setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in2Channel, 0);
+        // Brake IN1=HIGH, IN2=HIGH
+        setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in1Channel, arr);
+        setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in2Channel, arr);
     }
 }
 
@@ -170,13 +167,13 @@ void bspMotorStop(EMotorId_t motor, EMotorBrakeMode_t brakeMode)
 
     if (brakeMode == MOTOR_BRAKE_ACTIVE)
     {
-        // Active brake: both IN pins HIGH
+        // Active brake: both HIGH
         setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in1Channel, LL_TIM_GetAutoReload(s_motorConfigs[motor]->pTimer));
         setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in2Channel, LL_TIM_GetAutoReload(s_motorConfigs[motor]->pTimer));
     }
     else
     {
-        // Coast: both IN pins LOW
+        // Coast: both LOW
         setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in1Channel, 0);
         setChannelDuty(s_motorConfigs[motor]->pTimer, s_motorConfigs[motor]->in2Channel, 0);
     }

@@ -59,10 +59,6 @@ void motionSaveCalibration(void);
 bool motionLoadCalibration(void);
 bool motionIsCalibrated(void);
 
-// Encoder resolution measurement (uses Z-index)
-uint16_t motionMeasureColumnPPR(void);
-uint16_t motionMeasureHeadPPR(void);
-
 // Position limits
 void motionSetColumnMaxPosition(int32_t counts);
 void motionSetHeadMaxPosition(int32_t counts);

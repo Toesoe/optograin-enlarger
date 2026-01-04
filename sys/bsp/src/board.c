@@ -39,11 +39,9 @@
 
 const SEncoderConfig_t g_encoderHeadConfig = {
     .pTimer = TIM2,
-    .aPin = {{ LL_GPIO_PIN_0, GPIOA }, false },  // PA0 = TIM2_CH1 (was Z, now A)
-    .bPin = {{ LL_GPIO_PIN_1, GPIOA }, false },  // PA1 = TIM2_CH2 (B)
-    .zPin = {{ LL_GPIO_PIN_2, GPIOA }, LL_EXTI_LINE_2 },  // PA2 moved to Z-index (was A)
-    .aChannel = LL_TIM_CHANNEL_CH1,  // Encoder mode requires CH1
-    .bChannel = LL_TIM_CHANNEL_CH2,  // Encoder mode requires CH2
+    .aPin = {{ LL_GPIO_PIN_0, GPIOA }, false },
+    .bPin = {{ LL_GPIO_PIN_1, GPIOA }, false },
+    .zPin = {{ LL_GPIO_PIN_2, GPIOA }, LL_EXTI_LINE_2 },
 };
 
 const SEncoderConfig_t g_encoderColumnConfig = {
@@ -51,13 +49,11 @@ const SEncoderConfig_t g_encoderColumnConfig = {
     .aPin = {{ LL_GPIO_PIN_7, GPIOA }, false },
     .bPin = {{ LL_GPIO_PIN_6, GPIOA }, false },
     .zPin = {{ LL_GPIO_PIN_5, GPIOA }, LL_EXTI_LINE_5 },
-    .aChannel = LL_TIM_CHANNEL_CH2,
-    .bChannel = LL_TIM_CHANNEL_CH1,
 };
 
 const SMotorConfig_t g_motorColumnConfig = {
     .pTimer = TIM1,
-    .pwmFrequency = 25000,        // 25 kHz
+    .pwmFrequency = 25000,
     .in1Pin = {{ LL_GPIO_PIN_8, GPIOA }, false },
     .in2Pin = {{ LL_GPIO_PIN_9, GPIOA }, false },
     .in1Channel = LL_TIM_CHANNEL_CH1,
@@ -69,7 +65,7 @@ const SMotorConfig_t g_motorColumnConfig = {
 
 const SMotorConfig_t g_motorHeadConfig = {
     .pTimer = TIM1,
-    .pwmFrequency = 25000,        // 25 kHz
+    .pwmFrequency = 25000,
     .in1Pin = {{ LL_GPIO_PIN_10, GPIOA }, false },
     .in2Pin = {{ LL_GPIO_PIN_11, GPIOA }, false },
     .in1Channel = LL_TIM_CHANNEL_CH3,
@@ -81,14 +77,14 @@ const SMotorConfig_t g_motorHeadConfig = {
 
 const SLampConfig_t g_lampConfig = {
     .pTimer = TIM4,
-    .controlPin = {{ LL_GPIO_PIN_12, GPIOB }, true }, // PB12 output
+    .controlPin = {{ LL_GPIO_PIN_12, GPIOB }, true },
 };
 
 const SUartConfig_t g_uart1Config = {
     .pUsart = USART1,
     .txPin = { { LL_GPIO_PIN_6, GPIOB }, false },
     .rxPin = { { LL_GPIO_PIN_7, GPIOB }, false },
-    .remapAlternateFunction = true, // use PB6/PB7 instead of PA9/PA10
+    .remapAlternateFunction = true, // use USART1 AF pins PB6/PB7
     .baudRate = 460800,
     .dataBits = 8,
     .stopBits = 1
@@ -212,4 +208,9 @@ static void initSysclock(void)
     // Update SystemCoreClock variable and configure SysTick
     LL_SetSystemCoreClock(SYS_CLK_FREQ_HZ);
     LL_Init1msTick(SYS_CLK_FREQ_HZ);
+}
+
+uint32_t getCurrentSystick(void)
+{
+    return SysTick->VAL;
 }

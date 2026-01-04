@@ -106,13 +106,13 @@ int32_t motionGetHeadCount(void)
 
 float motionGetColumnVelocity_mmps(void)
 {
-    int16_t velocity_cpm = bspEncoderGetVelocity(ENCODER_COLUMN);
+    int32_t velocity_cpm = bspEncoderGetVelocity(ENCODER_COLUMN);
     return (float)velocity_cpm / s_calibration.columnCountsPerMm;
 }
 
 float motionGetHeadVelocity_mmps(void)
 {
-    int16_t velocity_cpm = bspEncoderGetVelocity(ENCODER_HEAD);
+    int32_t velocity_cpm = bspEncoderGetVelocity(ENCODER_HEAD);
     return (float)velocity_cpm / s_calibration.headCountsPerMm;
 }
 
@@ -205,118 +205,4 @@ int32_t motionGetColumnMaxPosition(void)
 int32_t motionGetHeadMaxPosition(void)
 {
     return s_calibration.headMaxPosition;
-}
-
-uint16_t motionMeasureColumnPPR(void)
-{
-    // Measure counts per revolution using Z-index
-    // User must rotate encoder at least one full revolution
-    // Motor must already be running before calling this
-    
-    // Disable auto-reset so Z pulse only sets flag, doesn't reset counter
-    bspEncoderSetAutoResetOnZ(ENCODER_COLUMN, false);
-    
-    // Clear homed flag and wait for first Z pulse
-    bspEncoderClearHomedFlag(ENCODER_COLUMN);
-    
-    uint32_t timeout = 10000000;  // ~10 seconds at 64MHz
-    while (!bspEncoderIsHomed(ENCODER_COLUMN) && --timeout > 0);
-    
-    if (timeout == 0)
-        return 0;  // Timeout - encoder not rotating
-    
-    // Record count at first Z pulse
-    int32_t startCount = bspEncoderGetCount(ENCODER_COLUMN);
-    
-    // Clear homed flag (but don't reset counter!)
-    bspEncoderClearHomedFlag(ENCODER_COLUMN);
-    
-    // Wait for second Z pulse (one full revolution)
-    timeout = 10000000;
-    while (!bspEncoderIsHomed(ENCODER_COLUMN) && --timeout > 0);
-    
-    if (timeout == 0)
-        return 0;  // Timeout
-    
-    int32_t endCount = bspEncoderGetCount(ENCODER_COLUMN);
-    int32_t cpr = endCount - startCount;
-    
-    // Handle negative rotation
-    if (cpr < 0) cpr = -cpr;
-    
-    // PPR = CPR / 4 (X4 mode)
-    uint16_t ppr = (uint16_t)(cpr / 4);
-    
-    // Re-enable auto-reset for normal homing operation
-    bspEncoderSetAutoResetOnZ(ENCODER_COLUMN, true);
-    
-    return ppr;
-}
-
-uint16_t motionMeasureHeadPPR(void)
-{
-    // Measure counts per revolution using Z-index
-    // Motor must already be running before calling this
-    
-    extern void SEGGER_RTT_WriteString(unsigned BufferIndex, const char * s);
-    
-    // Disable auto-reset so Z pulse only sets flag, doesn't reset counter
-    bspEncoderSetAutoResetOnZ(ENCODER_HEAD, false);
-    
-    // Clear homed flag and wait for first Z pulse
-    bspEncoderClearHomedFlag(ENCODER_HEAD);
-    
-    SEGGER_RTT_WriteString(0, "Waiting for first Z pulse...\n");
-    uint32_t timeout = 10000000;
-    while (!bspEncoderIsHomed(ENCODER_HEAD) && --timeout > 0);
-    
-    if (timeout == 0)
-    {
-        SEGGER_RTT_WriteString(0, "TIMEOUT: No Z pulse detected!\n");
-        return 0;  // Timeout - motor not running or no Z pulse
-    }
-    
-    SEGGER_RTT_WriteString(0, "First Z pulse detected!\n");
-    
-    // Record count at first Z pulse
-    int32_t startCount = bspEncoderGetCount(ENCODER_HEAD);
-    
-    // Clear homed flag (but don't reset counter!)
-    bspEncoderClearHomedFlag(ENCODER_HEAD);
-    
-    SEGGER_RTT_WriteString(0, "Waiting for second Z pulse...\n");
-    // Wait for second Z pulse (one full revolution)
-    timeout = 10000000;
-    while (!bspEncoderIsHomed(ENCODER_HEAD) && --timeout > 0);
-    
-    if (timeout == 0)
-    {
-        SEGGER_RTT_WriteString(0, "TIMEOUT: Second Z pulse not detected!\n");
-        return 0;  // Timeout
-    }
-    
-    SEGGER_RTT_WriteString(0, "Second Z pulse detected!\n");
-    
-    if (timeout == 0)
-        return 0;  // Timeout
-    
-    // Record count at second Z pulse
-    int32_t endCount = bspEncoderGetCount(ENCODER_HEAD);
-    int32_t cpr = endCount - startCount;
-    
-    // Debug output
-    extern void SEGGER_RTT_printf(unsigned BufferIndex, const char * sFormat, ...);
-    SEGGER_RTT_printf(0, "PPR Debug: start=%d, end=%d, delta=%d\n", startCount, endCount, cpr);
-    
-    // Handle negative rotation
-    if (cpr < 0) cpr = -cpr;
-    
-    // PPR = CPR / 4 (X4 mode)
-    uint16_t ppr = (uint16_t)(cpr / 4);
-    SEGGER_RTT_printf(0, "PPR Debug: abs(cpr)=%d, ppr=%d\n", cpr, ppr);
-    
-    // Re-enable auto-reset for normal homing operation
-    bspEncoderSetAutoResetOnZ(ENCODER_HEAD, true);
-    
-    return ppr;
 }

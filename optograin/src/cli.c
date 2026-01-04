@@ -48,20 +48,11 @@ typedef struct
     bool ready;
 } SCliState_t;
 
-typedef struct
-{
-    bool active;
-    bool isHead;  // true = head, false = column
-    float targetDistance;
-    int32_t startCount;
-} SCalibrationState_t;
-
 //=====================================================================================================================
 // Globals
 //=====================================================================================================================
 
 static SCliState_t gs_cli = { 0 };
-static SCalibrationState_t gs_calibrationState = { 0 };
 
 //=====================================================================================================================
 // Prototypes
@@ -74,6 +65,7 @@ static void cliHandleMotor(const char *args);
 static void cliHandleLamp(const char *args);
 static void cliHandleHome(const char *args);
 static void cliHandleCalibrate(const char *args);
+static void cliCalibrateAxis(EEncoderId_t encoder, EMotorId_t motor, const char *axisName);
 static void exposureCallback(void *ctx);
 
 //=====================================================================================================================
@@ -208,10 +200,8 @@ static void cliShowHelp(void)
     SEGGER_RTT_WriteString(0, "  lamp <ms>                 - Timed exposure (milliseconds)\n");
     SEGGER_RTT_WriteString(0, "  home head                 - Home head axis\n");
     SEGGER_RTT_WriteString(0, "  home column               - Home column axis\n");
-    SEGGER_RTT_WriteString(0, "  cal ppr head              - Measure head encoder PPR\n");
-    SEGGER_RTT_WriteString(0, "  cal ppr column            - Measure column encoder PPR\n");
-    SEGGER_RTT_WriteString(0, "  cal head <mm>             - Calibrate head (call twice: start, then finish)\n");
-    SEGGER_RTT_WriteString(0, "  cal column <mm>           - Calibrate column (call twice: start, then finish)\n");
+    SEGGER_RTT_WriteString(0, "  cal head                  - Calibrate head (interactive Z-pulse method)\n");
+    SEGGER_RTT_WriteString(0, "  cal column                - Calibrate column (interactive Z-pulse method)\n");
     SEGGER_RTT_WriteString(0, "  cal status                - Show calibration status\n");
     SEGGER_RTT_WriteString(0, "\n");
 }
@@ -220,11 +210,11 @@ static void cliHandleEncoders(void)
 {
     int32_t headPos = bspEncoderGetCount(ENCODER_HEAD);
     int32_t columnPos = bspEncoderGetCount(ENCODER_COLUMN);
-    bool headHomed = bspEncoderIsHomed(ENCODER_HEAD);
-    bool columnHomed = bspEncoderIsHomed(ENCODER_COLUMN);
+    bool headZRef = bspEncoderHasZIndexReference(ENCODER_HEAD);
+    bool columnZRef = bspEncoderHasZIndexReference(ENCODER_COLUMN);
     
-    SEGGER_RTT_printf(0, "Head:   %6d counts %s\n", headPos, headHomed ? "[HOMED]" : "[NOT HOMED]");
-    SEGGER_RTT_printf(0, "Column: %6d counts %s\n", columnPos, columnHomed ? "[HOMED]" : "[NOT HOMED]");
+    SEGGER_RTT_printf(0, "Head:   %6d counts %s\n", headPos, headZRef ? "[Z-REF]" : "[NO Z-REF]");
+    SEGGER_RTT_printf(0, "Column: %6d counts %s\n", columnPos, columnZRef ? "[Z-REF]" : "[NO Z-REF]");
     
     // Show position in mm if calibrated
     if (motionIsCalibrated())
@@ -412,165 +402,189 @@ static void cliHandleCalibrate(const char *args)
             SEGGER_RTT_printf(0, "Column position: %.2f mm\n", columnPos);
         }
     }
-    else if (strncmp(args, "ppr ", 4) == 0)
+    else if (strcmp(args, "head") == 0)
     {
-        const char *axis = args + 4;
-        EEncoderId_t encoder;
-        EMotorId_t motor;
-        
-        if (strcmp(axis, "head") == 0)
-        {
-            encoder = ENCODER_HEAD;
-            motor = MOTOR_HEAD;
-        }
-        else if (strcmp(axis, "column") == 0)
-        {
-            encoder = ENCODER_COLUMN;
-            motor = MOTOR_COLUMN;
-        }
-        else
-        {
-            SEGGER_RTT_WriteString(0, "Usage: cal ppr <head|column>\n");
-            return;
-        }
-        
-        SEGGER_RTT_printf(0, "Measuring %s encoder PPR...\n", axis);
-        
-        int16_t speed = 150;
-        bool success = false;
-        
-        for (int attempt = 0; attempt < 2 && !success; attempt++)
-        {
-            if (attempt == 1)
-            {
-                SEGGER_RTT_WriteString(0, "Stall detected, reversing direction...\n");
-                speed = (int16_t)(-speed);
-            }
-            
-            SEGGER_RTT_printf(0, "Starting motor at speed %d\n", speed);
-            bspMotorSetSpeed(motor, speed);
-            
-            // Check for stall - wait 200ms and see if encoder moved
-            int32_t startPos = bspEncoderGetCount(encoder);
-            SEGGER_RTT_printf(0, "Initial encoder count: %d\n", startPos);
-            hwDelayMs(200);
-            int32_t checkPos = bspEncoderGetCount(encoder);
-            SEGGER_RTT_printf(0, "After 200ms count: %d\n", checkPos);
-            
-            if (checkPos == startPos)
-            {
-                SEGGER_RTT_WriteString(0, "Motor stalled (no movement detected)\n");
-                bspMotorStop(motor, MOTOR_BRAKE_COAST);
-                continue;
-            }
-            
-            SEGGER_RTT_printf(0, "Motor moving, measuring PPR...\n");
-            
-            // Motor is moving, measure PPR
-            uint16_t ppr = (encoder == ENCODER_HEAD) ? motionMeasureHeadPPR() : motionMeasureColumnPPR();
-            
-            bspMotorStop(motor, MOTOR_BRAKE_COAST);
-            
-            SEGGER_RTT_printf(0, "%s encoder PPR: %d\n", axis, ppr);
-            success = true;
-        }
-        
-        if (!success)
-        {
-            SEGGER_RTT_WriteString(0, "Error: Motor stalled in both directions\n");
-            SEGGER_RTT_WriteString(0, "Check for mechanical obstruction or limit switch\n");
-        }
+        cliCalibrateAxis(ENCODER_HEAD, MOTOR_HEAD, "head");
     }
-    else if (strncmp(args, "head ", 5) == 0)
+    else if (strcmp(args, "column") == 0)
     {
-        float distance = (float)atof(args + 5);
-        if (distance > 0.0f && distance < 1000.0f)
-        {
-            if (!gs_calibrationState.active || !gs_calibrationState.isHead)
-            {
-                // First call - start calibration
-                gs_calibrationState.active = true;
-                gs_calibrationState.isHead = true;
-                gs_calibrationState.targetDistance = distance;
-                gs_calibrationState.startCount = motionGetHeadCount();
-                
-                SEGGER_RTT_printf(0, "Head calibration started: %.2f mm\n", distance);
-                SEGGER_RTT_printf(0, "Starting count: %d\n", gs_calibrationState.startCount);
-                SEGGER_RTT_WriteString(0, "Use 'motor head <speed>' to move the head exactly this distance\n");
-                SEGGER_RTT_printf(0, "Then run 'cal head %.2f' again to complete calibration\n", distance);
-            }
-            else
-            {
-                // Second call - finish calibration
-                int32_t endCount = motionGetHeadCount();
-                int32_t deltaCount = endCount - gs_calibrationState.startCount;
-                
-                SEGGER_RTT_printf(0, "Ending count: %d\n", endCount);
-                SEGGER_RTT_printf(0, "Delta counts: %d\n", deltaCount);
-                
-                // Set the calibration start to our saved value and calculate
-                motionSetCalibrationStartHead(gs_calibrationState.startCount);
-                motionCalibrateHead_mm(distance);
-                
-                float countsPerMm = (float)deltaCount / distance;
-                SEGGER_RTT_printf(0, "Counts per mm: %.2f\n", countsPerMm);
-                SEGGER_RTT_WriteString(0, "Head axis calibration complete\n");
-                
-                // Reset calibration state
-                gs_calibrationState.active = false;
-            }
-        }
-        else
-        {
-            SEGGER_RTT_WriteString(0, "Error: Distance must be 0.01 to 999.99 mm\n");
-        }
-    }
-    else if (strncmp(args, "column ", 7) == 0)
-    {
-        float distance = (float)atof(args + 7);
-        if (distance > 0.0f && distance < 1000.0f)
-        {
-            if (!gs_calibrationState.active || gs_calibrationState.isHead)
-            {
-                // First call - start calibration
-                gs_calibrationState.active = true;
-                gs_calibrationState.isHead = false;
-                gs_calibrationState.targetDistance = distance;
-                gs_calibrationState.startCount = motionGetColumnCount();
-                
-                SEGGER_RTT_printf(0, "Column calibration started: %.2f mm\n", distance);
-                SEGGER_RTT_printf(0, "Starting count: %d\n", gs_calibrationState.startCount);
-                SEGGER_RTT_WriteString(0, "Use 'motor column <speed>' to move the column exactly this distance\n");
-                SEGGER_RTT_printf(0, "Then run 'cal column %.2f' again to complete calibration\n", distance);
-            }
-            else
-            {
-                // Second call - finish calibration
-                int32_t endCount = motionGetColumnCount();
-                int32_t deltaCount = endCount - gs_calibrationState.startCount;
-                
-                SEGGER_RTT_printf(0, "Ending count: %d\n", endCount);
-                SEGGER_RTT_printf(0, "Delta counts: %d\n", deltaCount);
-                
-                // Set the calibration start to our saved value and calculate
-                motionSetCalibrationStartColumn(gs_calibrationState.startCount);
-                motionCalibrateColumn_mm(distance);
-                
-                float countsPerMm = (float)deltaCount / distance;
-                SEGGER_RTT_printf(0, "Counts per mm: %.2f\n", countsPerMm);
-                SEGGER_RTT_WriteString(0, "Column axis calibration complete\n");
-                
-                // Reset calibration state
-                gs_calibrationState.active = false;
-            }
-        }
-        else
-        {
-            SEGGER_RTT_WriteString(0, "Error: Distance must be 0.01 to 999.99 mm\n");
-        }
+        cliCalibrateAxis(ENCODER_COLUMN, MOTOR_COLUMN, "column");
     }
     else
     {
-        SEGGER_RTT_WriteString(0, "Usage: cal <status|ppr|head|column> [args]\n");
+        SEGGER_RTT_WriteString(0, "Usage: cal <status|head|column>\n");
+    }
+}
+
+static void cliCalibrateAxis(EEncoderId_t encoder, EMotorId_t motor, const char *axisName)
+{
+    SEGGER_RTT_printf(0, "\nCalibrating %s axis (100 PPR encoder)\n", axisName);
+    SEGGER_RTT_WriteString(0, "This will move the motor through one encoder revolution\n");
+    SEGGER_RTT_WriteString(0, "\n");
+    
+    int16_t speed = 150;
+    
+    // Try forward first, reverse if stalled
+    for (int attempt = 0; attempt < 2; attempt++)
+    {
+        if (attempt == 1)
+        {
+            SEGGER_RTT_WriteString(0, "Stall detected, reversing direction...\n");
+            speed = (int16_t)(-speed);
+        }
+        
+        // Clear Z-index reference
+        bspEncoderClearZIndexReference(encoder);
+        
+        // Start motor
+        SEGGER_RTT_printf(0, "Starting motor at speed %d...\n", speed);
+        bspMotorSetSpeed(motor, speed);
+        
+        // Check for stall after 200ms
+        int32_t startPos = bspEncoderGetCount(encoder);
+        hwDelayMs(200);
+        int32_t checkPos = bspEncoderGetCount(encoder);
+        
+        if (checkPos == startPos)
+        {
+            SEGGER_RTT_WriteString(0, "Motor stalled (no movement detected)\n");
+            bspMotorStop(motor, MOTOR_BRAKE_COAST);
+            if (attempt == 1)
+            {
+                SEGGER_RTT_WriteString(0, "Error: Motor stalled in both directions\n");
+                return;
+            }
+            continue;
+        }
+        
+        // Motor is moving - wait for first Z-index pulse
+        SEGGER_RTT_WriteString(0, "Waiting for first Z-index pulse...\n");
+        uint32_t timeout = 10000; // 10 second timeout
+        while (!bspEncoderHasZIndexReference(encoder) && timeout-- > 0)
+        {
+            hwDelayMs(1);
+        }
+        
+        if (!bspEncoderHasZIndexReference(encoder))
+        {
+            SEGGER_RTT_WriteString(0, "Error: Z-index timeout (check encoder wiring)\n");
+            bspMotorStop(motor, MOTOR_BRAKE_COAST);
+            return;
+        }
+        
+        // Stop at first Z-index
+        bspMotorStop(motor, MOTOR_BRAKE_ACTIVE);
+        hwDelayMs(100);
+        
+        SEGGER_RTT_WriteString(0, "\nFirst Z-index found! Motor stopped.\n");
+        SEGGER_RTT_WriteString(0, "Mark this position and press Enter to continue...\n");
+        
+        // Wait for user to press Enter
+        while (true)
+        {
+            char c;
+            if (SEGGER_RTT_Read(0, &c, 1) > 0 && (c == '\r' || c == '\n'))
+            {
+                break;
+            }
+            hwDelayMs(10);
+        }
+        
+        // Record starting position and clear Z-index
+        int32_t startCount = bspEncoderGetCount(encoder);
+        bspEncoderClearZIndexReference(encoder);
+        
+        SEGGER_RTT_WriteString(0, "\nContinuing to next Z-index pulse...\n");
+        
+        // Start motor again
+        bspMotorSetSpeed(motor, speed);
+        
+        // Wait for next Z-index (one full revolution)
+        timeout = 20000; // 20 second timeout
+        while (!bspEncoderHasZIndexReference(encoder) && timeout-- > 0)
+        {
+            hwDelayMs(1);
+        }
+        
+        if (!bspEncoderHasZIndexReference(encoder))
+        {
+            SEGGER_RTT_WriteString(0, "Error: Z-index timeout\n");
+            bspMotorStop(motor, MOTOR_BRAKE_COAST);
+            return;
+        }
+        
+        // Stop at second Z-index
+        bspMotorStop(motor, MOTOR_BRAKE_ACTIVE);
+        hwDelayMs(100);
+        int32_t endCount = bspEncoderGetCount(encoder);
+        
+        int32_t countDiff = endCount - startCount;
+        if (countDiff < 0) countDiff = -countDiff; // Absolute value
+        
+        SEGGER_RTT_WriteString(0, "\nSecond Z-index found! Motor stopped.\n");
+        SEGGER_RTT_printf(0, "Encoder moved %d counts\n", countDiff);
+        SEGGER_RTT_WriteString(0, "\nEnter the distance traveled in mm: ");
+        
+        // Read distance from user
+        char distBuf[16] = {0};
+        uint8_t distPos = 0;
+        
+        while (true)
+        {
+            char c;
+            if (SEGGER_RTT_Read(0, &c, 1) > 0)
+            {
+                if (c == '\r' || c == '\n')
+                {
+                    SEGGER_RTT_WriteString(0, "\n");
+                    break;
+                }
+                else if (c == '\b' || c == 127)
+                {
+                    if (distPos > 0)
+                    {
+                        distPos--;
+                        distBuf[distPos] = 0;
+                        SEGGER_RTT_WriteString(0, "\b \b");
+                    }
+                }
+                else if ((c >= '0' && c <= '9') || c == '.')
+                {
+                    if (distPos < 15)
+                    {
+                        distBuf[distPos++] = c;
+                        SEGGER_RTT_Write(0, &c, 1);
+                    }
+                }
+            }
+            hwDelayMs(10);
+        }
+        
+        float distance = (float)atof(distBuf);
+        
+        if (distance > 0.0f && distance < 1000.0f)
+        {
+            float countsPerMm = (float)countDiff / distance;
+            SEGGER_RTT_printf(0, "Calibration: %.2f counts/mm\n", countsPerMm);
+            
+            // Apply calibration
+            if (encoder == ENCODER_HEAD)
+            {
+                motionCalibrateHead_mm(distance);
+            }
+            else
+            {
+                motionCalibrateColumn_mm(distance);
+            }
+            
+            SEGGER_RTT_WriteString(0, "Calibration complete!\n");
+        }
+        else
+        {
+            SEGGER_RTT_WriteString(0, "Error: Invalid distance\n");
+        }
+        
+        bspMotorStop(motor, MOTOR_BRAKE_COAST);
+        return;
     }
 }

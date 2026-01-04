@@ -50,6 +50,8 @@ typedef struct
 void initBoard(void);
 void hwDelayMs(uint32_t);
 
+uint32_t getCurrentSystick(void);
+
 #ifdef __cplusplus
 }
 #endif
