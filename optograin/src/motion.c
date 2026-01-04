@@ -33,7 +33,7 @@
 
 static SMotionCalibration_t s_calibration = {
     .columnCountsPerMm = DEFAULT_COLUMN_COUNTS_PER_MM,
-    .headCountsPerMm = DEFAULT_HEAD_COUNTS_PER_MM,
+    .headCountsPerMm = 50.0f,
     .columnMaxPosition = 0,
     .headMaxPosition = 0,
     .pulsesPerRevolutionColumn = 0,
@@ -91,6 +91,10 @@ float motionGetColumnPosition_mm(void)
 float motionGetHeadPosition_mm(void)
 {
     int32_t counts = bspEncoderGetCount(ENCODER_HEAD);
+    
+    extern void SEGGER_RTT_printf(unsigned BufferIndex, const char * sFormat, ...);
+    SEGGER_RTT_printf(0, "DEBUG: counts=%d, countsPerMm=%f\n", counts, (double)s_calibration.headCountsPerMm);
+    
     return (float)counts / s_calibration.headCountsPerMm;
 }
 
@@ -149,9 +153,14 @@ void motionCalibrateHead_mm(float distance_mm)
     int32_t currentCount = bspEncoderGetCount(ENCODER_HEAD);
     int32_t deltaCounts = currentCount - s_calibrationStartHead;
     
+    extern void SEGGER_RTT_printf(unsigned BufferIndex, const char * sFormat, ...);
+    SEGGER_RTT_printf(0, "DEBUG: current=%d, start=%d, delta=%d, dist=%f\n", 
+                      currentCount, s_calibrationStartHead, deltaCounts, (double)distance_mm);
+    
     if (distance_mm > 0.1f)  // Sanity check
     {
         s_calibration.headCountsPerMm = (float)deltaCounts / distance_mm;
+        SEGGER_RTT_printf(0, "DEBUG: Set headCountsPerMm = %f\n", (double)s_calibration.headCountsPerMm);
     }
 }
 
@@ -185,6 +194,29 @@ bool motionLoadCalibration(void)
 bool motionIsCalibrated(void)
 {
     return s_isCalibrated;
+}
+
+bool motionIsHeadCalibrated(void)
+{
+    // Head is always calibrated with fixed 50 counts/mm
+    return true;
+}
+
+bool motionIsColumnCalibrated(void)
+{
+    // Check if column has non-default calibration
+    return (s_calibration.columnCountsPerMm > 0.0f && 
+            s_calibration.columnCountsPerMm != DEFAULT_COLUMN_COUNTS_PER_MM);
+}
+
+float motionGetHeadCountsPerMm(void)
+{
+    return s_calibration.headCountsPerMm;
+}
+
+float motionGetColumnCountsPerMm(void)
+{
+    return s_calibration.columnCountsPerMm;
 }
 
 void motionSetColumnMaxPosition(int32_t counts)

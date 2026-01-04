@@ -65,12 +65,69 @@ static void cliHandleMotor(const char *args);
 static void cliHandleLamp(const char *args);
 static void cliHandleHome(const char *args);
 static void cliHandleCalibrate(const char *args);
+static void cliHandleMove(const char *args);
 static void cliCalibrateAxis(EEncoderId_t encoder, EMotorId_t motor, const char *axisName);
 static void exposureCallback(void *ctx);
+static float parseFloat(const char *str);
 
 //=====================================================================================================================
 // Functions
 //=====================================================================================================================
+
+/**
+ * @brief Parse a float from a string (replacement for atof which doesn't work with newlib-nano)
+ * @param str String to parse
+ * @return Parsed float value
+ */
+static float parseFloat(const char *str)
+{
+    float result = 0.0f;
+    float sign = 1.0f;
+    bool hasDecimal = false;
+    float divisor = 1.0f;
+    
+    // Skip whitespace
+    while (*str == ' ' || *str == '\t') str++;
+    
+    // Check for sign
+    if (*str == '-')
+    {
+        sign = -1.0f;
+        str++;
+    }
+    else if (*str == '+')
+    {
+        str++;
+    }
+    
+    // Parse digits
+    while (*str)
+    {
+        if (*str >= '0' && *str <= '9')
+        {
+            if (hasDecimal)
+            {
+                divisor *= 10.0f;
+                result = result + (*str - '0') / divisor;
+            }
+            else
+            {
+                result = result * 10.0f + (*str - '0');
+            }
+        }
+        else if (*str == '.' && !hasDecimal)
+        {
+            hasDecimal = true;
+        }
+        else
+        {
+            break;
+        }
+        str++;
+    }
+    
+    return result * sign;
+}
 
 void cliInit(void)
 {
@@ -179,6 +236,10 @@ static void cliProcessCommand(const char *cmd)
     {
         cliHandleCalibrate(cmd + 4);
     }
+    else if (strncmp(cmd, "move ", 5) == 0)
+    {
+        cliHandleMove(cmd + 5);
+    }
     else
     {
         SEGGER_RTT_printf(0, "Unknown command: %s\n", cmd);
@@ -195,6 +256,8 @@ static void cliShowHelp(void)
     SEGGER_RTT_WriteString(0, "  motor column <speed>      - Set column motor speed (-1000 to 1000)\n");
     SEGGER_RTT_WriteString(0, "  motor stop                - Stop all motors\n");
     SEGGER_RTT_WriteString(0, "  motor test <head|column>  - Find minimum duty cycle\n");
+    SEGGER_RTT_WriteString(0, "  move head <mm>            - Move head to relative position (mm)\n");
+    SEGGER_RTT_WriteString(0, "  move column <mm>          - Move column to relative position (mm)\n");
     SEGGER_RTT_WriteString(0, "  lamp on                   - Turn lamp on\n");
     SEGGER_RTT_WriteString(0, "  lamp off                  - Turn lamp off\n");
     SEGGER_RTT_WriteString(0, "  lamp <ms>                 - Timed exposure (milliseconds)\n");
@@ -213,17 +276,36 @@ static void cliHandleEncoders(void)
     bool headZRef = bspEncoderHasZIndexReference(ENCODER_HEAD);
     bool columnZRef = bspEncoderHasZIndexReference(ENCODER_COLUMN);
     
-    SEGGER_RTT_printf(0, "Head:   %6d counts %s\n", headPos, headZRef ? "[Z-REF]" : "[NO Z-REF]");
-    SEGGER_RTT_printf(0, "Column: %6d counts %s\n", columnPos, columnZRef ? "[Z-REF]" : "[NO Z-REF]");
+    SEGGER_RTT_printf(0, "Head:   %6d counts %s\n", headPos, headZRef ? "[Z-REF]" : "");
+    SEGGER_RTT_printf(0, "Column: %6d counts %s\n", columnPos, columnZRef ? "[Z-REF]" : "");
     
-    // Show position in mm if calibrated
-    if (motionIsCalibrated())
+    // Show position in mm for calibrated axes
+    bool headCalibrated = motionIsHeadCalibrated();
+    bool columnCalibrated = motionIsColumnCalibrated();
+    
+    if (headCalibrated || columnCalibrated)
     {
-        float headMm = motionGetHeadPosition_mm();
-        float columnMm = motionGetColumnPosition_mm();
-        SEGGER_RTT_printf(0, "\nCalibrated positions:\n");
-        SEGGER_RTT_printf(0, "Head:   %.2f mm\n", headMm);
-        SEGGER_RTT_printf(0, "Column: %.2f mm\n", columnMm);
+        SEGGER_RTT_WriteString(0, "\nCalibrated positions:\n");
+        
+        if (headCalibrated)
+        {
+            float headMm = motionGetHeadPosition_mm();
+            SEGGER_RTT_printf(0, "Head:   %.2f mm\n", headMm);
+        }
+        else
+        {
+            SEGGER_RTT_WriteString(0, "Head:   (not calibrated)\n");
+        }
+        
+        if (columnCalibrated)
+        {
+            float columnMm = motionGetColumnPosition_mm();
+            SEGGER_RTT_printf(0, "Column: %.2f mm\n", columnMm);
+        }
+        else
+        {
+            SEGGER_RTT_WriteString(0, "Column: (not calibrated)\n");
+        }
     }
     else
     {
@@ -387,6 +469,128 @@ static void exposureCallback(void *ctx)
     SEGGER_RTT_WriteString(0, CLI_PROMPT);
 }
 
+static void cliHandleMove(const char *args)
+{
+    if (strncmp(args, "head ", 5) == 0)
+    {
+        if (!motionIsHeadCalibrated())
+        {
+            SEGGER_RTT_WriteString(0, "Error: Head axis not calibrated\n");
+            return;
+        }
+        
+        float distance = parseFloat(args + 5);
+        
+        if (distance < -500.0f || distance > 500.0f)
+        {
+            SEGGER_RTT_WriteString(0, "Error: Distance must be -500 to 500 mm\n");
+            return;
+        }
+        
+        int32_t startPos = bspEncoderGetCount(ENCODER_HEAD);
+        float startMm = motionGetHeadPosition_mm();
+        float targetMm = startMm + distance;
+        
+        // Calculate target counts
+        float countsPerMm = motionGetHeadCountsPerMm();
+        int32_t targetCounts = startPos + (int32_t)(distance * countsPerMm);
+        
+        SEGGER_RTT_printf(0, "Moving head %.2f mm (from %.2f to %.2f mm)\n", 
+                          (double)distance, (double)startMm, (double)targetMm);
+        
+        // Simple proportional control
+        int16_t speed = (distance > 0) ? 300 : -300;
+        bspMotorSetSpeed(MOTOR_HEAD, speed);
+        
+        // Wait until target reached
+        while (true)
+        {
+            int32_t currentPos = bspEncoderGetCount(ENCODER_HEAD);
+            int32_t error = targetCounts - currentPos;
+            
+            if (abs(error) < 10) // Within 10 counts
+            {
+                break;
+            }
+            
+            // Slow down as we approach target
+            if (abs(error) < 100)
+            {
+                speed = (error > 0) ? 150 : -150;
+                bspMotorSetSpeed(MOTOR_HEAD, speed);
+            }
+            
+            hwDelayMs(10);
+        }
+        
+        bspMotorStop(MOTOR_HEAD, MOTOR_BRAKE_ACTIVE);
+        
+        float finalMm = motionGetHeadPosition_mm();
+        SEGGER_RTT_printf(0, "Move complete. Position: %.2f mm\n", (double)finalMm);
+    }
+    else if (strncmp(args, "column ", 7) == 0)
+    {
+        if (!motionIsColumnCalibrated())
+        {
+            SEGGER_RTT_WriteString(0, "Error: Column axis not calibrated\n");
+            return;
+        }
+        
+        float distance = parseFloat(args + 7);
+        
+        if (distance < -500.0f || distance > 500.0f)
+        {
+            SEGGER_RTT_WriteString(0, "Error: Distance must be -500 to 500 mm\n");
+            return;
+        }
+        
+        int32_t startPos = bspEncoderGetCount(ENCODER_COLUMN);
+        float startMm = motionGetColumnPosition_mm();
+        float targetMm = startMm + distance;
+        
+        // Calculate target counts
+        float countsPerMm = motionGetColumnCountsPerMm();
+        int32_t targetCounts = startPos + (int32_t)(distance * countsPerMm);
+        
+        SEGGER_RTT_printf(0, "Moving column %.2f mm (from %.2f to %.2f mm)\n", 
+                          (double)distance, (double)startMm, (double)targetMm);
+        
+        // Simple proportional control
+        int16_t speed = (distance > 0) ? 300 : -300;
+        bspMotorSetSpeed(MOTOR_COLUMN, speed);
+        
+        // Wait until target reached
+        while (true)
+        {
+            int32_t currentPos = bspEncoderGetCount(ENCODER_COLUMN);
+            int32_t error = targetCounts - currentPos;
+            
+            if (abs(error) < 10) // Within 10 counts
+            {
+                break;
+            }
+            
+            // Slow down as we approach target
+            if (abs(error) < 100)
+            {
+                speed = (error > 0) ? 150 : -150;
+                bspMotorSetSpeed(MOTOR_COLUMN, speed);
+            }
+            
+            hwDelayMs(10);
+        }
+        
+        bspMotorStop(MOTOR_COLUMN, MOTOR_BRAKE_ACTIVE);
+        
+        float finalMm = motionGetColumnPosition_mm();
+        SEGGER_RTT_printf(0, "Move complete. Position: %.2f mm\n", (double)finalMm);
+    }
+    else
+    {
+        SEGGER_RTT_WriteString(0, "Usage: move <head|column> <mm>\n");
+    }
+}
+
 static void cliHandleCalibrate(const char *args)
 {
     if (strcmp(args, "status") == 0)
@@ -435,6 +639,9 @@ static void cliCalibrateAxis(EEncoderId_t encoder, EMotorId_t motor, const char 
         
         // Clear Z-index reference
         bspEncoderClearZIndexReference(encoder);
+        
+        // Disable auto-reset on Z pulse during calibration
+        bspEncoderSetAutoResetOnZ(encoder, false);
         
         // Start motor
         SEGGER_RTT_printf(0, "Starting motor at speed %d...\n", speed);
@@ -560,20 +767,29 @@ static void cliCalibrateAxis(EEncoderId_t encoder, EMotorId_t motor, const char 
             hwDelayMs(10);
         }
         
-        float distance = (float)atof(distBuf);
+        // Null terminate the buffer
+        distBuf[distPos] = '\0';
+        
+        double distance_d = atof(distBuf);
+        float distance = (float)distance_d;
+        
+        SEGGER_RTT_printf(0, "DEBUG: distBuf='%s' (len=%d), distance_d=%f, distance=%f\n", 
+                          distBuf, (int)distPos, distance_d, (double)distance);
         
         if (distance > 0.0f && distance < 1000.0f)
         {
             float countsPerMm = (float)countDiff / distance;
             SEGGER_RTT_printf(0, "Calibration: %.2f counts/mm\n", countsPerMm);
             
-            // Apply calibration
+            // Apply calibration - set start position then calculate
             if (encoder == ENCODER_HEAD)
             {
+                motionSetCalibrationStartHead(startCount);
                 motionCalibrateHead_mm(distance);
             }
             else
             {
+                motionSetCalibrationStartColumn(startCount);
                 motionCalibrateColumn_mm(distance);
             }
             
@@ -583,6 +799,9 @@ static void cliCalibrateAxis(EEncoderId_t encoder, EMotorId_t motor, const char 
         {
             SEGGER_RTT_WriteString(0, "Error: Invalid distance\n");
         }
+        
+        // Re-enable auto-reset for normal operation
+        bspEncoderSetAutoResetOnZ(encoder, true);
         
         bspMotorStop(motor, MOTOR_BRAKE_COAST);
         return;

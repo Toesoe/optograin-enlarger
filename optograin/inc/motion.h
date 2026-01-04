@@ -58,6 +58,11 @@ void motionCalibrateHead_mm(float distance_mm);
 void motionSaveCalibration(void);
 bool motionLoadCalibration(void);
 bool motionIsCalibrated(void);
+bool motionIsHeadCalibrated(void);
+bool motionIsColumnCalibrated(void);
+
+float motionGetHeadCountsPerMm(void);
+float motionGetColumnCountsPerMm(void);
 
 // Position limits
 void motionSetColumnMaxPosition(int32_t counts);

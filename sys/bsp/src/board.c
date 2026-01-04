@@ -72,7 +72,7 @@ const SMotorConfig_t g_motorHeadConfig = {
     .in2Channel = LL_TIM_CHANNEL_CH4,
     .useRemapPins = false,
     .invertDirection = false,
-    .minDutyPercent = 59
+    .minDutyPercent = 17
 };
 
 const SLampConfig_t g_lampConfig = {

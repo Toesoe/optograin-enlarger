@@ -119,7 +119,7 @@ void bspEncoderInit(EEncoderId_t encoderId, const SEncoderConfig_t *pEncoderConf
     {
         LL_GPIO_AF_SetEXTISource(extiSrc, LL_GPIO_AF_EXTI_LINE2);
     }
-    else if (pEncoderConfig->zPin.pinPort.pin == LL_EXTI_LINE_5)
+    else if (pEncoderConfig->zPin.extiLine == LL_EXTI_LINE_5)
     {
         LL_GPIO_AF_SetEXTISource(extiSrc, LL_GPIO_AF_EXTI_LINE5);
     }
@@ -159,8 +159,8 @@ int32_t bspEncoderGetCount(EEncoderId_t encoder)
     }
 
     // combine overflow with current timer count, subtract mid-point offset
-    return (gs_encoderStates[encoder].overflowCount << 16) |
-           (uint16_t)LL_TIM_GetCounter(gs_encoderStates[encoder].pConfig->pTimer) - 0x8000;
+    return ((gs_encoderStates[encoder].overflowCount << 16) |
+           (uint16_t)LL_TIM_GetCounter(gs_encoderStates[encoder].pConfig->pTimer)) - 0x8000;
 }
 
 void bspEncoderReset(EEncoderId_t encoder)
