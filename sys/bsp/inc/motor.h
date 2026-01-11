@@ -6,21 +6,6 @@
  * - 2x DRV8871DA brushed DC motor drivers (H-bridge)
  * - TIM1 PWM generation (all 4 channels)
  *
- * Control Method (per DRV8871):
- * - Forward:  IN1=PWM, IN2=LOW
- * - Reverse:  IN1=LOW, IN2=PWM
- * - Brake:    IN1=HIGH, IN2=HIGH
- * - Coast:    IN1=LOW, IN2=LOW
- *
- * Pin Allocation (after bodge):
- * - Column Motor: PA8 (TIM1_CH1/IN1), PA9 (TIM1_CH2/IN2)
- * - Head Motor:   PA10 (TIM1_CH3/IN1), PA11 (TIM1_CH4/IN2)
- *
- * Required Bodges:
- * - PB2  → PA8  (Column motor IN1)
- * - PB10 → PA9  (Column motor IN2)
- * - PB0  → PA10 (Head motor IN1)
- * - PB1  → PA11 (Head motor IN2)
  */
 
 #ifndef _MOTOR_H_
@@ -66,12 +51,12 @@ typedef enum
 typedef struct
 {
     TIM_TypeDef      *pTimer;
-    uint32_t          pwmFrequency; /**< PWM frequency in Hz (typically 20-25 kHz) */
+    uint32_t          pwmFrequency;
 
     SGenericGPIOPin_t in1Pin;
     SGenericGPIOPin_t in2Pin;
-    uint32_t          in1Channel; /**< TIM channel for IN1 pin */
-    uint32_t          in2Channel; /**< TIM channel for IN2 pin */
+    uint32_t          in1Channel;
+    uint32_t          in2Channel;
     bool              useRemapPins;
 
     bool              invertDirection;

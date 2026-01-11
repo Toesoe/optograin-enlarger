@@ -22,9 +22,9 @@
 typedef struct
 {
     const SEncoderConfig_t *pConfig;
-    volatile int32_t        overflowCount; // extends 16-bit timer to 32-bit
+    volatile int32_t        overflowCount;
     volatile bool           hasZIndexRef;
-    volatile bool           autoResetOnZ; // Auto-reset counter on Z pulse (for homing)
+    volatile bool           autoResetOnZ;
     int32_t                 lastCount;
     uint32_t                lastTimestamp;
 } SEncoderState_t;
@@ -224,7 +224,6 @@ void __attribute__((used)) TIM2_IRQHandler(void)
     {
         LL_TIM_ClearFlag_UPDATE(TIM2);
 
-        // Track overflow/underflow
         if (LL_TIM_GetDirection(TIM2) == LL_TIM_COUNTERDIRECTION_UP)
         {
             gs_encoderStates[ENCODER_HEAD].overflowCount++;
@@ -242,7 +241,6 @@ void __attribute__((used)) TIM3_IRQHandler(void)
     {
         LL_TIM_ClearFlag_UPDATE(TIM3);
 
-        // Track overflow/underflow
         if (LL_TIM_GetDirection(TIM3) == LL_TIM_COUNTERDIRECTION_UP)
         {
             gs_encoderStates[ENCODER_COLUMN].overflowCount++;
@@ -260,10 +258,8 @@ void __attribute__((used)) EXTI2_IRQHandler(void)
     {
         LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_2);
 
-        // Set homed flag
         gs_encoderStates[ENCODER_HEAD].hasZIndexRef = true;
 
-        // Only reset counter if auto-reset is enabled (for homing)
         if (gs_encoderStates[ENCODER_HEAD].autoResetOnZ)
         {
             gs_encoderStates[ENCODER_HEAD].overflowCount = 0;
@@ -278,11 +274,8 @@ void __attribute__((used)) EXTI9_5_IRQHandler(void)
     {
         LL_EXTI_ClearFlag_0_31(LL_EXTI_LINE_5);
 
-        // Z-index pulse detected on column encoder (PA5)
-        // Set homed flag
         gs_encoderStates[ENCODER_COLUMN].hasZIndexRef = true;
 
-        // Only reset counter if auto-reset is enabled (for homing)
         if (gs_encoderStates[ENCODER_COLUMN].autoResetOnZ)
         {
             gs_encoderStates[ENCODER_COLUMN].overflowCount = 0;

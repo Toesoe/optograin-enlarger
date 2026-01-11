@@ -17,6 +17,7 @@ extern "C"
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "encoder.h"
 
 //=====================================================================================================================
 // Types
@@ -38,37 +39,16 @@ typedef struct
 //=====================================================================================================================
 
 void motionInit(void);
-
-// Position tracking
-float motionGetColumnPosition_mm(void);
-float motionGetHeadPosition_mm(void);
-int32_t motionGetColumnCount(void);
-int32_t motionGetHeadCount(void);
-
-// Velocity
-float motionGetColumnVelocity_mmps(void);
-float motionGetHeadVelocity_mmps(void);
-
-// Calibration
-void motionStartCalibration(void);
-void motionSetCalibrationStartHead(int32_t count);
-void motionSetCalibrationStartColumn(int32_t count);
-void motionCalibrateColumn_mm(float distance_mm);
-void motionCalibrateHead_mm(float distance_mm);
+float motionGetPosition_mm(EEncoderId_t encoder);
+int32_t motionGetCount(EEncoderId_t encoder);
+float motionGetVelocity_mmps(EEncoderId_t encoder);
+void motionStartCalibration(EEncoderId_t encoder);
+void motionCalibrate_mm(EEncoderId_t encoder, float distance_mm);
 void motionSaveCalibration(void);
 bool motionLoadCalibration(void);
-bool motionIsCalibrated(void);
-bool motionIsHeadCalibrated(void);
-bool motionIsColumnCalibrated(void);
-
-float motionGetHeadCountsPerMm(void);
-float motionGetColumnCountsPerMm(void);
-
-// Position limits
-void motionSetColumnMaxPosition(int32_t counts);
-void motionSetHeadMaxPosition(int32_t counts);
-int32_t motionGetColumnMaxPosition(void);
-int32_t motionGetHeadMaxPosition(void);
+bool motionIsCalibrated(EEncoderId_t encoder);
+void motionSetMaxPosition(EEncoderId_t encoder, int32_t counts);
+int32_t motionGetMaxPosition(EEncoderId_t encoder);
 
 #ifdef __cplusplus
 }

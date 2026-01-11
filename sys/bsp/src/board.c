@@ -60,7 +60,7 @@ const SMotorConfig_t g_motorColumnConfig = {
     .in2Channel = LL_TIM_CHANNEL_CH2,
     .useRemapPins = false,
     .invertDirection = false,
-    .minDutyPercent = 30,
+    .minDutyPercent = 30, // TBD
 };
 
 const SMotorConfig_t g_motorHeadConfig = {

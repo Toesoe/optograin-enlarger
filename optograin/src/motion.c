@@ -13,7 +13,6 @@
 
 #include "motion.h"
 #include "encoder.h"
-#include "board.h"
 
 #include <string.h>
 
@@ -22,18 +21,34 @@
 //=====================================================================================================================
 
 #define COUNTS_PER_REV      (400)  // 100 PPR * 4 (X4 mode)
+#define DEFAULT_COUNTS_PER_MM (50.0f)
+#define FLOAT_EPSILON       (1e-6f)  // Epsilon for float comparisons
 
-// Default calibration values (conservative estimates)
-#define DEFAULT_COLUMN_COUNTS_PER_MM    (40.0f)
-#define DEFAULT_HEAD_COUNTS_PER_MM      (80.0f)
+//=====================================================================================================================
+// Private Functions - Helpers
+//=====================================================================================================================
+
+/**
+ * @brief Compare two floats with epsilon tolerance
+ * @param a First float
+ * @param b Second float
+ * @return -1 if a < b, 0 if equal, 1 if a > b
+ */
+static inline int fltcmp(float a, float b)
+{
+    float diff = a - b;
+    if (diff > FLOAT_EPSILON) return 1;
+    if (diff < -FLOAT_EPSILON) return -1;
+    return 0;
+}
 
 //=====================================================================================================================
 // Private Data
 //=====================================================================================================================
 
 static SMotionCalibration_t s_calibration = {
-    .columnCountsPerMm = DEFAULT_COLUMN_COUNTS_PER_MM,
-    .headCountsPerMm = 50.0f,
+    .columnCountsPerMm = DEFAULT_COUNTS_PER_MM,
+    .headCountsPerMm = DEFAULT_COUNTS_PER_MM,
     .columnMaxPosition = 0,
     .headMaxPosition = 0,
     .pulsesPerRevolutionColumn = 0,
@@ -77,90 +92,65 @@ void motionInit(void)
     // If no valid calibration, use defaults
     if (!s_isCalibrated)
     {
-        s_calibration.columnCountsPerMm = DEFAULT_COLUMN_COUNTS_PER_MM;
-        s_calibration.headCountsPerMm = DEFAULT_HEAD_COUNTS_PER_MM;
+        s_calibration.columnCountsPerMm = DEFAULT_COUNTS_PER_MM;
+        s_calibration.headCountsPerMm = DEFAULT_COUNTS_PER_MM;
     }
 }
 
-float motionGetColumnPosition_mm(void)
+float motionGetPosition_mm(EEncoderId_t encoder)
 {
-    int32_t counts = bspEncoderGetCount(ENCODER_COLUMN);
-    return (float)counts / s_calibration.columnCountsPerMm;
+    return (float)bspEncoderGetCount(encoder) / ((encoder == ENCODER_COLUMN) ? s_calibration.columnCountsPerMm : s_calibration.headCountsPerMm);
 }
 
-float motionGetHeadPosition_mm(void)
+int32_t motionGetCount(EEncoderId_t encoder)
 {
-    int32_t counts = bspEncoderGetCount(ENCODER_HEAD);
-    
-    extern void SEGGER_RTT_printf(unsigned BufferIndex, const char * sFormat, ...);
-    SEGGER_RTT_printf(0, "DEBUG: counts=%d, countsPerMm=%f\n", counts, (double)s_calibration.headCountsPerMm);
-    
-    return (float)counts / s_calibration.headCountsPerMm;
+    return bspEncoderGetCount(encoder);
 }
 
-int32_t motionGetColumnCount(void)
+float motionGetVelocity_mmps(EEncoderId_t encoder)
 {
-    return bspEncoderGetCount(ENCODER_COLUMN);
+    int32_t velocity_cpm = bspEncoderGetVelocity(encoder);
+    return (float)velocity_cpm / 
+           ((encoder == ENCODER_COLUMN) ? s_calibration.columnCountsPerMm : s_calibration.headCountsPerMm);
 }
 
-int32_t motionGetHeadCount(void)
-{
-    return bspEncoderGetCount(ENCODER_HEAD);
-}
-
-float motionGetColumnVelocity_mmps(void)
-{
-    int32_t velocity_cpm = bspEncoderGetVelocity(ENCODER_COLUMN);
-    return (float)velocity_cpm / s_calibration.columnCountsPerMm;
-}
-
-float motionGetHeadVelocity_mmps(void)
-{
-    int32_t velocity_cpm = bspEncoderGetVelocity(ENCODER_HEAD);
-    return (float)velocity_cpm / s_calibration.headCountsPerMm;
-}
-
-void motionStartCalibration(void)
+void motionStartCalibration(EEncoderId_t encoder)
 {
     // Record starting positions
-    s_calibrationStartColumn = bspEncoderGetCount(ENCODER_COLUMN);
-    s_calibrationStartHead = bspEncoderGetCount(ENCODER_HEAD);
-}
-
-void motionSetCalibrationStartHead(int32_t count)
-{
-    s_calibrationStartHead = count;
-}
-
-void motionSetCalibrationStartColumn(int32_t count)
-{
-    s_calibrationStartColumn = count;
-}
-
-void motionCalibrateColumn_mm(float distance_mm)
-{
-    int32_t currentCount = bspEncoderGetCount(ENCODER_COLUMN);
-    int32_t deltaCounts = currentCount - s_calibrationStartColumn;
-    
-    if (distance_mm > 0.1f)  // Sanity check
+    if (encoder == ENCODER_COLUMN)
     {
-        s_calibration.columnCountsPerMm = (float)deltaCounts / distance_mm;
+        s_calibrationStartColumn = bspEncoderGetCount(ENCODER_COLUMN);
+    }
+    else if (encoder == ENCODER_HEAD)
+    {
+        s_calibrationStartHead = bspEncoderGetCount(ENCODER_HEAD);
     }
 }
 
-void motionCalibrateHead_mm(float distance_mm)
+void motionCalibrate_mm(EEncoderId_t encoder, float distance_mm)
 {
-    int32_t currentCount = bspEncoderGetCount(ENCODER_HEAD);
-    int32_t deltaCounts = currentCount - s_calibrationStartHead;
-    
-    extern void SEGGER_RTT_printf(unsigned BufferIndex, const char * sFormat, ...);
-    SEGGER_RTT_printf(0, "DEBUG: current=%d, start=%d, delta=%d, dist=%f\n", 
-                      currentCount, s_calibrationStartHead, deltaCounts, (double)distance_mm);
-    
-    if (distance_mm > 0.1f)  // Sanity check
+    int32_t currentCount = bspEncoderGetCount(encoder);
+    int32_t deltaCounts = 0;
+
+    if (encoder == ENCODER_COLUMN)
     {
-        s_calibration.headCountsPerMm = (float)deltaCounts / distance_mm;
-        SEGGER_RTT_printf(0, "DEBUG: Set headCountsPerMm = %f\n", (double)s_calibration.headCountsPerMm);
+        deltaCounts = currentCount - s_calibrationStartColumn;
+    }
+    else if (encoder == ENCODER_HEAD)
+    {
+        deltaCounts = currentCount - s_calibrationStartHead;
+    }
+
+    if (fltcmp(distance_mm, 0.1f) > 0)  // Sanity check
+    {
+        if (encoder == ENCODER_COLUMN)
+        {
+            s_calibration.columnCountsPerMm = (float)deltaCounts / distance_mm;
+        }
+        else if (encoder == ENCODER_HEAD)
+        {
+            s_calibration.headCountsPerMm = (float)deltaCounts / distance_mm;
+        }
     }
 }
 
@@ -191,50 +181,44 @@ bool motionLoadCalibration(void)
     return false;
 }
 
-bool motionIsCalibrated(void)
+bool motionIsCalibrated(EEncoderId_t encoder)
 {
-    return s_isCalibrated;
+    if (encoder == ENCODER_COLUMN)
+    {
+        return (fltcmp(s_calibration.columnCountsPerMm, 0.0f) > 0 && 
+                fltcmp(s_calibration.columnCountsPerMm, DEFAULT_COUNTS_PER_MM) != 0);
+    }
+    else if (encoder == ENCODER_HEAD)
+    {
+        return (fltcmp(s_calibration.headCountsPerMm, 0.0f) > 0 && 
+                fltcmp(s_calibration.headCountsPerMm, DEFAULT_COUNTS_PER_MM) != 0);
+    }
+
+    return false;
 }
 
-bool motionIsHeadCalibrated(void)
+void motionSetMaxPosition(EEncoderId_t encoder, int32_t counts)
 {
-    // Head is always calibrated with fixed 50 counts/mm
-    return true;
+    if (encoder == ENCODER_COLUMN)
+    {
+        s_calibration.columnMaxPosition = counts;
+    }
+    else if (encoder == ENCODER_HEAD)
+    {
+        s_calibration.headMaxPosition = counts;
+    }
 }
 
-bool motionIsColumnCalibrated(void)
+int32_t motionGetMaxPosition(EEncoderId_t encoder)
 {
-    // Check if column has non-default calibration
-    return (s_calibration.columnCountsPerMm > 0.0f && 
-            s_calibration.columnCountsPerMm != DEFAULT_COLUMN_COUNTS_PER_MM);
-}
+    if (encoder == ENCODER_COLUMN)
+    {
+        return s_calibration.columnMaxPosition;
+    }
+    else if (encoder == ENCODER_HEAD)
+    {
+        return s_calibration.headMaxPosition;
+    }
 
-float motionGetHeadCountsPerMm(void)
-{
-    return s_calibration.headCountsPerMm;
-}
-
-float motionGetColumnCountsPerMm(void)
-{
-    return s_calibration.columnCountsPerMm;
-}
-
-void motionSetColumnMaxPosition(int32_t counts)
-{
-    s_calibration.columnMaxPosition = counts;
-}
-
-void motionSetHeadMaxPosition(int32_t counts)
-{
-    s_calibration.headMaxPosition = counts;
-}
-
-int32_t motionGetColumnMaxPosition(void)
-{
-    return s_calibration.columnMaxPosition;
-}
-
-int32_t motionGetHeadMaxPosition(void)
-{
-    return s_calibration.headMaxPosition;
+    return 0;
 }
