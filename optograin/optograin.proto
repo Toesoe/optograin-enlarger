@@ -11,6 +11,7 @@ enum CommandType {
     CMD_CALIBRATE = 6;          // Restart homing/calibration sequence
 }
 
+// command : control box -> enlarger
 message Command {
     required CommandType type = 1;
     
@@ -22,6 +23,7 @@ message Command {
     optional float lens_board_position_mm = 4;
 }
 
+// status: enlarger -> control box
 message Status {
     // Lamp state
     required bool lamp_on = 1;
