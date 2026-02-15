@@ -2,7 +2,7 @@
     "version": "1.0.0",
     "configurations": [
         {
-        "name": "JLink: debug current CMake build target (U5)",
+        "name": "JLink: debug current CMake build target",
             "type": "cortex-debug",
             "request": "launch",
             "cwd": "${workspaceFolder}",

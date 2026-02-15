@@ -1,3 +1,9 @@
 [submodule "sys/stm32-hal/STM32CubeF1"]
 	path = sys/stm32-hal/STM32CubeF1
 	url = https://github.com/STMicroelectronics/STM32CubeF1.git
+[submodule "lib/protobuf"]
+	path = lib/protobuf
+	url = https://github.com/protocolbuffers/protobuf.git
+[submodule "lib/nanopb"]
+	path = lib/nanopb
+	url = https://github.com/nanopb/nanopb.git

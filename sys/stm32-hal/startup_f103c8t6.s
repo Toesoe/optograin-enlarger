@@ -10,7 +10,6 @@
 .global g_pfnVectors
 .global Default_Handler
 
-/* Linker script symbols */
 .word _sidata
 .word _sdata
 .word _edata
@@ -19,14 +18,12 @@
 
 .equ BootRAM, 0xF108F85F
 
-/* Reset Handler */
 .section .text.Reset_Handler
 .weak Reset_Handler
 .type Reset_Handler, %function
 Reset_Handler:
     bl SystemInit
 
-    /* Copy .data from flash to SRAM */
     ldr r0, =_sdata
     ldr r1, =_edata
     ldr r2, =_sidata
@@ -43,7 +40,6 @@ LoopCopyDataInit:
     cmp r4, r1
     bcc CopyDataInit
 
-    /* Zero fill .bss */
     ldr r2, =_sbss
     ldr r4, =_ebss
     movs r3, #0
@@ -57,12 +53,10 @@ LoopFillZerobss:
     cmp r2, r4
     bcc FillZerobss
 
-    /* Call main */
     bl main
     bx lr
 .size Reset_Handler, .-Reset_Handler
 
-/* Default Handler */
 .section .text.Default_Handler,"ax",%progbits
 Default_Handler:
 Infinite_Loop:

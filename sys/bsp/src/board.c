@@ -78,6 +78,15 @@ const SMotorConfig_t g_motorHeadConfig = {
 const SLampConfig_t g_lampConfig = {
     .pTimer = TIM4,
     .controlPin = {{ LL_GPIO_PIN_12, GPIOB }, true },
+    .fanConfig = {
+        .pwmPin = {{ LL_GPIO_PIN_14, GPIOB }, true },
+        .tachPin = {{ LL_GPIO_PIN_13, GPIOB }, false },
+    }
+};
+
+const SFanConfig_t g_fanConfig = {
+    .pwmPin = {{ LL_GPIO_PIN_13, GPIOB }, true },
+    .tachPin = {{ LL_GPIO_PIN_14, GPIOB }, false },
 };
 
 const SUartConfig_t g_uart1Config = {
@@ -91,9 +100,6 @@ const SUartConfig_t g_uart1Config = {
 };
 
 // plain old GPIOs
-SGenericGPIOPin_t g_fanTachPin = { { LL_GPIO_PIN_14, GPIOB}, false };
-SGenericGPIOPin_t g_fanPwmPin = { { LL_GPIO_PIN_13, GPIOB }, true }; // softpwm
-
 SGenericGPIOPin_t g_turretSwitchA = { { LL_GPIO_PIN_1, GPIOB }, false }; 
 SGenericGPIOPin_t g_turretSwitchB = { { LL_GPIO_PIN_15, GPIOB }, false };
 

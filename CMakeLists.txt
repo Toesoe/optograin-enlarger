@@ -8,6 +8,16 @@ project(optograin
     VERSION "0.0.1"
 )
 
+# Use venv Python if it exists
+if(EXISTS "${CMAKE_SOURCE_DIR}/.venv/bin/python3")
+    set(Python3_EXECUTABLE "${CMAKE_SOURCE_DIR}/.venv/bin/python3")
+    message(STATUS "Using Python from venv: ${Python3_EXECUTABLE}")
+    
+    # Use wrapper script that sets up PYTHONPATH for protoc and nanopb plugin
+    set(PROTOBUF_PROTOC_EXECUTABLE "${CMAKE_SOURCE_DIR}/scripts/protoc-wrapper.sh")
+    message(STATUS "Using protoc wrapper: ${PROTOBUF_PROTOC_EXECUTABLE}")
+endif()
+
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
@@ -47,6 +57,7 @@ add_subdirectory(optograin)
 target_link_libraries(${FW_ELF_FILE} PRIVATE
     optograin_bsp
     segger_rtt
+    nanopb
 )
 
 target_link_options(${FW_ELF_FILE} PRIVATE

@@ -1,0 +1,46 @@
+syntax = "proto2";
+
+// Commands from control box (F4) to enlarger (F103)
+enum CommandType {
+    CMD_SET_LAMP = 0;           // Turn lamp on/off with duration
+    CMD_SET_FAN = 1;            // Set fan speed
+    CMD_MOVE_HEAD = 2;          // Move enlarger head to position
+    CMD_MOVE_LENS_BOARD = 3;    // Move lens board to position
+    CMD_STOP = 4;               // Emergency stop
+    CMD_GET_STATUS = 5;         // Request status update
+    CMD_CALIBRATE = 6;          // Restart homing/calibration sequence
+}
+
+message Command {
+    required CommandType type = 1;
+    
+    // Lamp control (on duration in ms, 0 = off)
+    optional uint32 lamp_duration_ms = 2;
+    
+    // Position commands in mm (enlarger handles calibration internally)
+    optional float head_position_mm = 3;
+    optional float lens_board_position_mm = 4;
+}
+
+message Status {
+    // Lamp state
+    required bool lamp_on = 1;
+    required uint32 exposure_remaining_ms = 2;
+    required float lamp_temperature = 3;
+    
+    // Fan state
+    required uint32 fan_speed_rpm = 4;
+    
+    // Current positions in mm (calibrated on startup)
+    required float head_position_mm = 5;
+    required float lens_board_position_mm = 6;
+    required bool positions_calibrated = 7;  // False until homing complete
+    
+    // Selected lens (physical switch/sensor reading)
+    required uint32 lens_index = 8;
+    
+    // Error flags
+    required bool error_overtemp = 9;
+    required bool error_fan = 10;
+    required bool error_position = 11;
+}

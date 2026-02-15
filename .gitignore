@@ -6,3 +6,7 @@ Doxygen/
 *.DS_Store
 .cache
 external
+
+# Python venv
+.venv/
+venv/
