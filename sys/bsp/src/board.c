@@ -14,6 +14,7 @@
 #include "lamp.h"
 #include "motor.h"
 
+#include "switch.h"
 #include "uart.h"
 
 #include "SEGGER_RTT.h"
@@ -25,7 +26,8 @@
 #include <stm32f1xx_ll_bus.h>
 #include <stm32f1xx_ll_system.h>
 #include <stm32f1xx_ll_utils.h>
-#include "stm32f1xx_ll_exti.h"
+#include <stm32f1xx_ll_exti.h>
+#include <stm32f1xx_ll_crc.h>
 
 //=====================================================================================================================
 // Defines
@@ -146,6 +148,14 @@ void initBoard(void)
     bspMotorInit(MOTOR_HEAD, &g_motorHeadConfig);
     bspLampInit(&g_lampConfig);
 
+    bspSwitchInit(SWITCH_LENS_INDEX_A, &g_turretSwitchA);
+    bspSwitchInit(SWITCH_LENS_INDEX_B, &g_turretSwitchB);
+
+    bspSwitchInit(SWITCH_HEAD_TOP_LIMIT, &g_headLimitTop);
+    bspSwitchInit(SWITCH_HEAD_BOTTOM_LIMIT, &g_headLimitBottom);
+    bspSwitchInit(SWITCH_COLUMN_TOP_LIMIT, &g_columnLimitTop);
+    bspSwitchInit(SWITCH_COLUMN_BOTTOM_LIMIT, &g_columnLimitBottom);
+
     bspMotorEnable(true);
 
     SEGGER_RTT_WriteString(0, "BSP init complete");
@@ -154,6 +164,17 @@ void initBoard(void)
 void hwDelayMs(uint32_t ms)
 {
     LL_mDelay(ms);
+}
+
+uint32_t getCurrentSystick(void)
+{
+    return SysTick->VAL;
+}
+
+
+void getCRC32(const uint8_t *pData)
+{
+
 }
 
 //=====================================================================================================================
@@ -214,9 +235,4 @@ static void initSysclock(void)
     // Update SystemCoreClock variable and configure SysTick
     LL_SetSystemCoreClock(SYS_CLK_FREQ_HZ);
     LL_Init1msTick(SYS_CLK_FREQ_HZ);
-}
-
-uint32_t getCurrentSystick(void)
-{
-    return SysTick->VAL;
 }

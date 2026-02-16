@@ -121,6 +121,14 @@ void bspUartInit(const SUartConfig_t *pPeripheralConfig)
     LL_USART_EnableIT_ERROR(pPeripheral);
 }
 
+void bspUartTransmitFrame(const uint8_t *pData, size_t size)
+{
+    for (size_t i = 0; i < size; i++)
+    {
+        LL_USART_TransmitData8(USART1, pData[i]);
+    }
+}
+
 void toggleUsartRX(bool enable)
 {
     // enable ? LL_USART_EnableDirectionRx(g_pConsoleUsart) : LL_USART_DisableDirectionRx(g_pConsoleUsart);

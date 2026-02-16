@@ -1,7 +1,7 @@
 /**
- * @file interface.h
- * @author Toesoe (thijs@nbtg.dev; github.com/toesoe)
- * @brief data structure and functions for communication between control box and logic PCB
+ * @file switch.h
+ * @author Toesoe (thijs@nbtg.dev, github.com/Toesoe)
+ * @brief switch reading and debouncing for lens selection and limit switches
  * @version 0.1
  * @date 15-02-2026
  * 
@@ -9,20 +9,26 @@
  * 
  */
 
-#ifndef _INTERFACE_H_
-#define _INTERFACE_H_
+#ifndef _SWITCH_H_
+#define _SWITCH_H_
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 //=====================================================================================================================
 // Includes
 //=====================================================================================================================
 
-#include <stdbool.h>
+#include "board.h"
+
 #include <stdint.h>
 #include <stddef.h>
+
+//=====================================================================================================================
+// Defines
+//=====================================================================================================================
 
 //=====================================================================================================================
 // Types
@@ -30,20 +36,26 @@ extern "C" {
 
 typedef enum
 {
-    MESSAGE_HEADER_BYTE_PROTOBUF_DATABLOCK = 0xAA,
-    MESSAGE_HEADER_BYTE_COMMAND_STATUS = 0x55
-} EMessageHeaderByte_t;
-
+    SWITCH_LENS_INDEX_A = 0,
+    SWITCH_LENS_INDEX_B,
+    SWITCH_COLUMN_TOP_LIMIT,
+    SWITCH_COLUMN_BOTTOM_LIMIT,
+    SWITCH_HEAD_TOP_LIMIT,
+    SWITCH_HEAD_BOTTOM_LIMIT,
+    SWITCH_COUNT
+} ESwitchId_t;
 
 //=====================================================================================================================
 // Functions
 //=====================================================================================================================
 
-void pbBuildAndTransmitStatusMessage(void);
-void pbDecodeAndHandleCommandMessage(const uint8_t *, size_t);
+bool bspSwitchInit(ESwitchId_t, const SGenericGPIOPin_t *);
+bool bspSwitchRead(ESwitchId_t);
+int  bspSwitchGetCurrentLensIndex(void);
+
+void bspSwitchAttachCallback(ESwitchId_t, void (*)(void *), void *);
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif // _INTERFACE_H_
+#endif //!_SWITCH_H_

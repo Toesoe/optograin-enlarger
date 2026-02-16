@@ -1,11 +1,16 @@
 /**
- * @file board.h
- *
- * @brief board-specific functionality
+ * @file crc.h
+ * @author Toesoe (thijs@nbtg.dev, github.com/Toesoe)
+ * @brief crc32 bindings
+ * @version 0.1
+ * @date 15-02-2026
+ * 
+ * @copyright Copyright (c) 2026
+ * 
  */
 
-#ifndef _BOARD_H_
-#define _BOARD_H_
+#ifndef _CRC_H_
+#define _CRC_H_
 
 #ifdef __cplusplus
 extern "C"
@@ -16,45 +21,33 @@ extern "C"
 // Includes
 //=====================================================================================================================
 
-#include <stm32f1xx_ll_gpio.h>
+#include "board.h"
+
+#include <stdint.h>
+#include <stddef.h>
+
+//=====================================================================================================================
+// Defines
+//=====================================================================================================================
+
+#define CRC32_SIZE_BYTES (4)
 
 //=====================================================================================================================
 // Types
 //=====================================================================================================================
 
-/** @brief basic GPIO pin/port definition */
-typedef struct
-{
-    uint32_t pin;
-    GPIO_TypeDef *port;
-} SGPIOPin_t;
-
-/** @brief GPIO pin/port definition with input/output flag */
-typedef struct
-{
-    SGPIOPin_t pinPort;
-    bool isOutput;
-} SGenericGPIOPin_t;
-
-/** @brief EXTI mapped GPIO pin/port definition */
-typedef struct
-{
-    SGPIOPin_t pinPort;
-    uint32_t extiLine;
-} SEXTIGPIOPin_t;
-
 //=====================================================================================================================
 // Functions
 //=====================================================================================================================
 
-void initBoard(void);
-void hwDelayMs(uint32_t);
+void bspInitCRC(void);
+void bspStartCRCBlock(void);
+void bspFeedCRCBlock(const uint8_t *, size_t);
+uint32_t bspCalculateCRCBlock(void);
 
-void getCRC32(const uint8_t *);
-
-uint32_t getCurrentSystick(void);
+uint32_t bspCalculateCRCData(const uint8_t *, size_t);
 
 #ifdef __cplusplus
 }
 #endif
-#endif //!_BOARD_H_
+#endif //!_ENCODER_H_

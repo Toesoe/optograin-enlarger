@@ -43,6 +43,13 @@ typedef struct
     SFanConfig_t fanConfig;
 } SLampConfig_t;
 
+typedef struct
+{
+    uint32_t fanSpeedRPM;
+    uint8_t dutyCyclePercent;
+    bool hasError;
+} SFanStatus_t;
+
 //=====================================================================================================================
 // Functions
 //=====================================================================================================================
@@ -60,6 +67,7 @@ uint32_t bspLampGetRemainingTime(void);
 // Fan PWM control
 void bspFanInit(const SFanConfig_t *pFanConfig);
 void bspFanSetDuty(uint8_t percent);
+SFanStatus_t bspFanGetStatus(void);
 
 // Fan tach (prepared for future use)
 void bspFanTachInit(void);

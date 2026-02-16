@@ -64,22 +64,6 @@ static int32_t s_calibrationStartHead = 0;
 // Private Functions
 //=====================================================================================================================
 
-static uint32_t calculateCRC32(const uint8_t *data, size_t length)
-{
-    uint32_t crc = 0xFFFFFFFF;
-    
-    for (size_t i = 0; i < length; i++)
-    {
-        crc ^= data[i];
-        for (uint8_t j = 0; j < 8; j++)
-        {
-            crc = (crc >> 1) ^ (0xEDB88320 & -(crc & 1));
-        }
-    }
-    
-    return ~crc;
-}
-
 //=====================================================================================================================
 // Public Functions
 //=====================================================================================================================
@@ -157,10 +141,7 @@ void motionCalibrate_mm(EEncoderId_t encoder, float distance_mm)
 void motionSaveCalibration(void)
 {
     // Calculate CRC excluding the CRC field itself
-    s_calibration.crc32 = calculateCRC32(
-        (uint8_t *)&s_calibration, 
-        sizeof(SMotionCalibration_t) - sizeof(uint32_t)
-    );
+    s_calibration.crc32 = 0x0;
     
     // TODO: Write to EEPROM
     // For now, just mark as calibrated

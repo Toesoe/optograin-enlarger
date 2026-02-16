@@ -50,6 +50,7 @@ typedef struct
 //=====================================================================================================================
 
 void bspUartInit(const SUartConfig_t *);
+void bspUartTransmitFrame(const uint8_t *, size_t);
 
 void toggleUsartRX(bool);
 
