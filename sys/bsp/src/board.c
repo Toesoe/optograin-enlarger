@@ -105,9 +105,9 @@ const SUartConfig_t g_uart1Config = {
 SGenericGPIOPin_t g_turretSwitchA = { { LL_GPIO_PIN_1, GPIOB }, false }; 
 SGenericGPIOPin_t g_turretSwitchB = { { LL_GPIO_PIN_15, GPIOB }, false };
 
-SGenericGPIOPin_t g_headLimitTop = { { LL_GPIO_PIN_0, GPIOB }, false };
+SEXTIGPIOPin_t g_headLimitTop = { { LL_GPIO_PIN_0, GPIOB }, LL_EXTI_LINE_0 };
 SGenericGPIOPin_t g_headLimitBottom = { { LL_GPIO_PIN_2, GPIOB }, false };
-SGenericGPIOPin_t g_columnLimitTop = { { LL_GPIO_PIN_12, GPIOA }, false };
+SEXTIGPIOPin_t g_columnLimitTop = { { LL_GPIO_PIN_12, GPIOA }, LL_EXTI_LINE_12 };
 SGenericGPIOPin_t g_columnLimitBottom = { { LL_GPIO_PIN_11, GPIOB }, false };
 
 //=====================================================================================================================
@@ -148,13 +148,13 @@ void initBoard(void)
     bspMotorInit(MOTOR_HEAD, &g_motorHeadConfig);
     bspLampInit(&g_lampConfig);
 
-    bspSwitchInit(SWITCH_LENS_INDEX_A, &g_turretSwitchA);
-    bspSwitchInit(SWITCH_LENS_INDEX_B, &g_turretSwitchB);
+    bspSwitchInit(SWITCH_LENS_INDEX_A, &g_turretSwitchA, nullptr);
+    bspSwitchInit(SWITCH_LENS_INDEX_B, &g_turretSwitchB, nullptr);
 
-    bspSwitchInit(SWITCH_HEAD_TOP_LIMIT, &g_headLimitTop);
-    bspSwitchInit(SWITCH_HEAD_BOTTOM_LIMIT, &g_headLimitBottom);
-    bspSwitchInit(SWITCH_COLUMN_TOP_LIMIT, &g_columnLimitTop);
-    bspSwitchInit(SWITCH_COLUMN_BOTTOM_LIMIT, &g_columnLimitBottom);
+    bspSwitchInit(SWITCH_HEAD_TOP_LIMIT, nullptr, &g_headLimitTop);
+    bspSwitchInit(SWITCH_HEAD_BOTTOM_LIMIT, &g_headLimitBottom, nullptr);
+    bspSwitchInit(SWITCH_COLUMN_TOP_LIMIT, nullptr, &g_columnLimitTop);
+    bspSwitchInit(SWITCH_COLUMN_BOTTOM_LIMIT, &g_columnLimitBottom, nullptr);
 
     bspMotorEnable(true);
 

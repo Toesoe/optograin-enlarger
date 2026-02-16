@@ -111,7 +111,12 @@ void pbDecodeAndHandleCommandMessage(const uint8_t *data, size_t size)
     // handle command
     switch (message.type)
     {
-        case CommandType_CMD_SET_LAMP:
+        case CommandType_CMD_SET_LAMP_ON:
+        {
+            bspLampSet(true);
+            break;
+        }
+        case CommandType_CMD_SET_LAMP_TIME:
         {
             if (message.has_lamp_duration_ms)
             {
@@ -146,7 +151,6 @@ void pbDecodeAndHandleCommandMessage(const uint8_t *data, size_t size)
         case CommandType_CMD_STOP:
         {
             bspMotorEmergencyStop();
-            bspLampCancelExposure();
             commandWasHandledSuccessfully = true;
             break;
         }

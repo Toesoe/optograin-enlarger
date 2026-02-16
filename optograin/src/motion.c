@@ -13,6 +13,8 @@
 
 #include "motion.h"
 #include "encoder.h"
+#include "motor.h"
+#include "switch.h"
 
 #include <string.h>
 
@@ -46,7 +48,7 @@ static inline int fltcmp(float a, float b)
 // Private Data
 //=====================================================================================================================
 
-static SMotionCalibration_t s_calibration = {
+static SMotionCalibration_t sg_motionState = {
     .columnCountsPerMm = DEFAULT_COUNTS_PER_MM,
     .headCountsPerMm = DEFAULT_COUNTS_PER_MM,
     .columnMaxPosition = 0,
@@ -54,6 +56,7 @@ static SMotionCalibration_t s_calibration = {
     .pulsesPerRevolutionColumn = 0,
     .pulsesPerRevolutionHead = 0,
     .crc32 = 0,
+    .columnBottomLimitEnabled = false
 };
 
 static bool s_isCalibrated = false;
@@ -63,6 +66,8 @@ static int32_t s_calibrationStartHead = 0;
 //=====================================================================================================================
 // Private Functions
 //=====================================================================================================================
+
+static void motionLimitSwitchCallback(void *);
 
 //=====================================================================================================================
 // Public Functions
@@ -76,14 +81,17 @@ void motionInit(void)
     // If no valid calibration, use defaults
     if (!s_isCalibrated)
     {
-        s_calibration.columnCountsPerMm = DEFAULT_COUNTS_PER_MM;
-        s_calibration.headCountsPerMm = DEFAULT_COUNTS_PER_MM;
+        sg_motionState.columnCountsPerMm = DEFAULT_COUNTS_PER_MM;
+        sg_motionState.headCountsPerMm = DEFAULT_COUNTS_PER_MM;
     }
+
+    bspSwitchAttachCallback(SWITCH_COLUMN_TOP_LIMIT, motionLimitSwitchCallback, (void *)(uintptr_t)SWITCH_COLUMN_TOP_LIMIT);
+    bspSwitchAttachCallback(SWITCH_HEAD_TOP_LIMIT, motionLimitSwitchCallback, (void *)(uintptr_t)SWITCH_HEAD_TOP_LIMIT);
 }
 
 float motionGetPosition_mm(EEncoderId_t encoder)
 {
-    return (float)bspEncoderGetCount(encoder) / ((encoder == ENCODER_COLUMN) ? s_calibration.columnCountsPerMm : s_calibration.headCountsPerMm);
+    return (float)bspEncoderGetCount(encoder) / ((encoder == ENCODER_COLUMN) ? sg_motionState.columnCountsPerMm : sg_motionState.headCountsPerMm);
 }
 
 int32_t motionGetCount(EEncoderId_t encoder)
@@ -95,7 +103,7 @@ float motionGetVelocity_mmps(EEncoderId_t encoder)
 {
     int32_t velocity_cpm = bspEncoderGetVelocity(encoder);
     return (float)velocity_cpm / 
-           ((encoder == ENCODER_COLUMN) ? s_calibration.columnCountsPerMm : s_calibration.headCountsPerMm);
+           ((encoder == ENCODER_COLUMN) ? sg_motionState.columnCountsPerMm : sg_motionState.headCountsPerMm);
 }
 
 void motionStartCalibration(EEncoderId_t encoder)
@@ -129,11 +137,11 @@ void motionCalibrate_mm(EEncoderId_t encoder, float distance_mm)
     {
         if (encoder == ENCODER_COLUMN)
         {
-            s_calibration.columnCountsPerMm = (float)deltaCounts / distance_mm;
+            sg_motionState.columnCountsPerMm = (float)deltaCounts / distance_mm;
         }
         else if (encoder == ENCODER_HEAD)
         {
-            s_calibration.headCountsPerMm = (float)deltaCounts / distance_mm;
+            sg_motionState.headCountsPerMm = (float)deltaCounts / distance_mm;
         }
     }
 }
@@ -141,7 +149,7 @@ void motionCalibrate_mm(EEncoderId_t encoder, float distance_mm)
 void motionSaveCalibration(void)
 {
     // Calculate CRC excluding the CRC field itself
-    s_calibration.crc32 = 0x0;
+    sg_motionState.crc32 = 0x0;
     
     // TODO: Write to EEPROM
     // For now, just mark as calibrated
@@ -166,13 +174,13 @@ bool motionIsCalibrated(EEncoderId_t encoder)
 {
     if (encoder == ENCODER_COLUMN)
     {
-        return (fltcmp(s_calibration.columnCountsPerMm, 0.0f) > 0 && 
-                fltcmp(s_calibration.columnCountsPerMm, DEFAULT_COUNTS_PER_MM) != 0);
+        return (fltcmp(sg_motionState.columnCountsPerMm, 0.0f) > 0 && 
+                fltcmp(sg_motionState.columnCountsPerMm, DEFAULT_COUNTS_PER_MM) != 0);
     }
     else if (encoder == ENCODER_HEAD)
     {
-        return (fltcmp(s_calibration.headCountsPerMm, 0.0f) > 0 && 
-                fltcmp(s_calibration.headCountsPerMm, DEFAULT_COUNTS_PER_MM) != 0);
+        return (fltcmp(sg_motionState.headCountsPerMm, 0.0f) > 0 && 
+                fltcmp(sg_motionState.headCountsPerMm, DEFAULT_COUNTS_PER_MM) != 0);
     }
 
     return false;
@@ -182,11 +190,11 @@ void motionSetMaxPosition(EEncoderId_t encoder, int32_t counts)
 {
     if (encoder == ENCODER_COLUMN)
     {
-        s_calibration.columnMaxPosition = counts;
+        sg_motionState.columnMaxPosition = counts;
     }
     else if (encoder == ENCODER_HEAD)
     {
-        s_calibration.headMaxPosition = counts;
+        sg_motionState.headMaxPosition = counts;
     }
 }
 
@@ -194,12 +202,41 @@ int32_t motionGetMaxPosition(EEncoderId_t encoder)
 {
     if (encoder == ENCODER_COLUMN)
     {
-        return s_calibration.columnMaxPosition;
+        return sg_motionState.columnMaxPosition;
     }
     else if (encoder == ENCODER_HEAD)
     {
-        return s_calibration.headMaxPosition;
+        return sg_motionState.headMaxPosition;
     }
 
     return 0;
+}
+
+
+static void motionLimitSwitchCallback(void *userCtx)
+{
+    // This callback is called when a limit switch is triggered during motion
+    // We can use this to stop the motor immediately and set the current position as the limit
+
+    ESwitchId_t switch_id = (ESwitchId_t)(uintptr_t)userCtx;
+
+    // Stop motor immediately
+    if (switch_id == SWITCH_COLUMN_TOP_LIMIT)
+    {
+        bspMotorStop(MOTOR_COLUMN, MOTOR_BRAKE_ACTIVE);
+    }
+    else if (sg_motionState.columnBottomLimitEnabled && (switch_id == SWITCH_COLUMN_BOTTOM_LIMIT))
+    {
+        bspMotorStop(MOTOR_COLUMN, MOTOR_BRAKE_ACTIVE);
+        sg_motionState.columnMaxPosition = bspEncoderGetCount(ENCODER_COLUMN);
+    }
+    else if (switch_id == SWITCH_HEAD_TOP_LIMIT)
+    {
+        bspMotorStop(MOTOR_HEAD, MOTOR_BRAKE_ACTIVE);
+    }
+    else if (switch_id == SWITCH_HEAD_BOTTOM_LIMIT)
+    {
+        bspMotorStop(MOTOR_HEAD, MOTOR_BRAKE_ACTIVE);
+        sg_motionState.headMaxPosition = bspEncoderGetCount(ENCODER_HEAD);
+    }
 }

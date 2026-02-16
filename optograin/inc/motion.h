@@ -27,11 +27,12 @@ typedef struct
 {
     float columnCountsPerMm;
     float headCountsPerMm;
-    int32_t columnMaxPosition;
-    int32_t headMaxPosition;
+    int32_t columnMaxPosition;  // counting from top limit switch as that's our reference point
+    int32_t headMaxPosition;    // counting from top limit switch as that's our reference point
     uint32_t crc32;
     uint16_t pulsesPerRevolutionColumn;
     uint16_t pulsesPerRevolutionHead;
+    bool columnBottomLimitEnabled;
 } SMotionCalibration_t;
 
 //=====================================================================================================================

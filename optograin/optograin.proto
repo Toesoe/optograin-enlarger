@@ -2,13 +2,14 @@ syntax = "proto2";
 
 // Commands from control box (F4) to enlarger (F103)
 enum CommandType {
-    CMD_SET_LAMP = 0;           // Turn lamp on/off with duration
-    CMD_SET_FAN = 1;            // Set fan speed
-    CMD_MOVE_HEAD = 2;          // Move enlarger head to position
-    CMD_MOVE_LENS_BOARD = 3;    // Move lens board to position
-    CMD_STOP = 4;               // Emergency stop
-    CMD_GET_STATUS = 5;         // Request status update
-    CMD_CALIBRATE = 6;          // Restart homing/calibration sequence
+    CMD_SET_LAMP_TIME = 0;           // Turn lamp on/off with duration
+    CMD_SET_LAMP_ON = 1;             // Turn lamp on indefinitely (until CMD_SET_LAMP_TIME with 0 duration)
+    CMD_SET_FAN = 2;            // Set fan speed
+    CMD_MOVE_HEAD = 3;          // Move enlarger head to position
+    CMD_MOVE_LENS_BOARD = 4;    // Move lens board to position
+    CMD_STOP = 5;               // Emergency stop
+    CMD_GET_STATUS = 6;         // Request status update
+    CMD_CALIBRATE = 7;          // Restart homing/calibration sequence
 }
 
 // command : control box -> enlarger

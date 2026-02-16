@@ -1,7 +1,7 @@
 /**
  * @file switch.h
  * @author Toesoe (thijs@nbtg.dev, github.com/Toesoe)
- * @brief switch reading and debouncing for lens selection and limit switches
+ * @brief switch reading for lens selection and limit switches
  * @version 0.1
  * @date 15-02-2026
  * 
@@ -23,7 +23,6 @@ extern "C"
 
 #include "board.h"
 
-#include <stdint.h>
 #include <stddef.h>
 
 //=====================================================================================================================
@@ -49,7 +48,7 @@ typedef enum
 // Functions
 //=====================================================================================================================
 
-bool bspSwitchInit(ESwitchId_t, const SGenericGPIOPin_t *);
+bool bspSwitchInit(ESwitchId_t, const SGenericGPIOPin_t *, const SEXTIGPIOPin_t *);
 bool bspSwitchRead(ESwitchId_t);
 int  bspSwitchGetCurrentLensIndex(void);
 
